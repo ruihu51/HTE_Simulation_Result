@@ -126,3 +126,75 @@ summaries <- ddply(subset(ests, (type %in% c("Plug-in", "One-step", "TMLE-new"))
                    bias = mean(est - psi0, na.rm=TRUE),
                    var = var(est, na.rm=TRUE),
                    mse = mean((est - psi0)^2, na.rm=TRUE))
+
+
+# testing simulation result
+library(plyr)
+load('testing.rst.1.h2.RData')
+load('testing.rst.1.h3.RData')
+load('testing.rst.1.h4.in.RData')
+load('testing.rst.1.h5.in.RData')
+load('testing.rst.1.h4.in2.RData')
+load('testing.rst.1.h5.in.2.RData')
+load('testing.rst.1.h5.in3.RData')
+load('testing.rst.1.h5.in4.RData')
+load('testing.rst.1.h5.in5.RData')
+load('testing.rst.1.h5.in6.RData')
+load('testing.rst.1.h5.in7.RData')
+
+testing.rst.1.h4 <- rbind(testing.rst.1.h4.in, testing.rst.1.h4.in2)
+save(testing.rst.1.h4, file = 'testing.rst.1.h4.Rdata')
+
+testing.rst.1.h5 <- rbind(rbind(rbind(rbind(rbind(rbind(testing.rst.1.h5.in, testing.rst.1.h5.in.2),
+                                testing.rst.1.h5.in3),
+                          testing.rst.1.h5.in4),
+                          testing.rst.1.h5.in5),testing.rst.1.h5.in6),testing.rst.1.h5.in7)
+save(testing.rst.1.h5, file = 'testing.rst.1.h5.Rdata')
+
+length(unique(testing.rst.1.h5$seed))
+testing.rst.1.h5$j
+
+testing.rst.1.h5 <- testing.rst.1.h5.in3
+
+testing.rst.1 <- rbind(rbind(rbind(testing.rst.1.h2, testing.rst.1.h3),testing.rst.1.h4), testing.rst.1.h5)
+testing.rst.1
+save(testing.rst.1, file = 'testing.rst.1.Rdata')
+
+gamma.summaries.1 <- ddply(subset(testing.rst.1, (type %in% 'Gamma.stat')), .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           quantile.reject.rate = mean(stat>quantile),
+                           pvalue.reject.rate = mean(pvalue<0.05))
+
+omega.summaries.1 <- ddply(subset(testing.rst.1, (type %in% 'Omega.stat')), .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           quantile.reject.rate = mean(stat>quantile),
+                           pvalue.reject.rate = mean(pvalue<0.05))
+
+load('testing.rst.2.h1.in.RData')
+load('testing.rst.2.h2.RData')
+load('testing.rst.2.h3.RData')
+load('testing.rst.2.h4.in1.RData')
+
+testing.rst.2 <- rbind(rbind(rbind(testing.rst.2.h1.in, testing.rst.2.h2),
+                       testing.rst.2.h3),testing.rst.2.h4.in1)
+testing.rst.2
+
+gamma.summaries.2 <- ddply(subset(testing.rst.2, (type %in% 'Gamma.stat')), .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           quantile.reject.rate = mean(stat>quantile),
+                           pvalue.reject.rate = mean(pvalue<0.05))
+
+omega.summaries.2 <- ddply(subset(testing.rst.2, (type %in% 'Omega.stat')), .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           quantile.reject.rate = mean(stat>quantile),
+                           pvalue.reject.rate = mean(pvalue<0.05))
+
+
+
+
+
+
