@@ -29,6 +29,77 @@ ret1 <- htem.estimator(A, W, Y, control = list()) # default control setting-poin
 ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE)) # estimate with wald-type CI
 ret1 <- htem.estimator(A, W, Y, control = list(conf.int = TRUE, conf.int.type = 'boot')) # estimate with Bootstrap CI
 
+# default control setting-point estimate with only hybrid outputs
+# $ret
+# type        est        se
+# 1   psi.est 0.13016493 0.7394138
+# 2 theta.est 0.01530881 0.2236576
+ret1 <- htem.estimator(A, W, Y, control = list())
+
+# default control setting-point estimate with additional optional outputs
+# $ret
+# type        est        se
+# 1   psi.est 0.12898826 0.7441527
+# 2 theta.est 0.01345503 0.2204151
+#
+# $optional.ret
+# type       est        se
+# 1  psi.plug.in.est 0.1317073 0.7441527
+# 2 psi.one.step.est 0.1289883 0.7441527
+ret1 <- htem.estimator(A, W, Y, control = list(est.type = list('psi.est'='all', 'theta.est'='hybrid')))
+
+# estimate with wald-type CI
+# $ret
+# type       est       se          ll        ul
+# 1   psi.est 0.1310583 0.737582 0.085343285 0.1767732
+# 2 theta.est 0.0152913 0.221020 0.001592587 0.0289900
+#
+# $optional.ret
+# type       est       se
+# 1    psi.plug.in.est 0.1338398 0.737582
+# 2   psi.one.step.est 0.1310583 0.737582
+# 3  theta.plug.in.est 0.0197228 0.221020
+# 4 theta.one.step.est 0.0152913 0.221020
+ret1 <- htem.estimator(A, W, Y, control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+                                               conf.int.type = 'Wald',
+                                               conf.int = TRUE))
+
+# estimate with Bootstrap CI
+# $ret
+# type        est        se          ll        ul
+# 1   psi.est 0.13071134 0.7381247 0.082714492 0.1739515
+# 2 theta.est 0.01493656 0.2201738 0.001910335 0.0288994
+#
+# $optional.ret
+# type        est        se
+# 1    psi.plug.in.est 0.13358361 0.7381247
+# 2   psi.one.step.est 0.13071134 0.7381247
+# 3  theta.plug.in.est 0.01962606 0.2201738
+# 4 theta.one.step.est 0.01493656 0.2201738
+ret1 <- htem.estimator(A, W, Y, control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+                                               conf.int = TRUE,
+                                               conf.int.type = 'boot',
+                                               n.boot = 500))
+
+control = list(est.type = list('psi.est'='all', 'theta.est'='hybrid'))
+control <- hte.measure.NullTest.control(control)
+
+# simulation function
+control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+               conf.int = TRUE,
+               conf.int.type = 'Wald')
+ests.sim.1.1.sl <-  ests.sim(200, 1:500, control, out.glm=TRUE)
+control = list(conf.int = TRUE,
+               conf.int.type = 'boot')
+ests.sim.1.2.sl <-  ests.sim(200, 1:500, control, out.glm=TRUE)
+
+n<-1000
+do.call(generate.data, list(n=n))
+generate.data(n)
+
+
+
+
 # simulation function
 ests.sim <-  function(n_range, j_range, control, null.sims=FALSE, out.glm=TRUE){
   ests <- ldply(n_range, function(n) {
@@ -236,7 +307,7 @@ cov.var <- FALSE
 
 null.sims <- FALSE
 
-n <- 2000
+n <- 500
 set.seed(3933)
 W <- matrix(runif(n*3, 0, 1), ncol=3)
 A <- rbinom(n, size = 1, prob = pi0(W))
@@ -250,7 +321,12 @@ if(null.sims) {
   theta0 <- var((mu0(1,W) - mu0(0,W)))
 }
 
-hteNullTest(Y, A, W, control = list(verbose=TRUE), out.glm=TRUE, cov.var=TRUE)
+control = list(verbose=TRUE)
+hteNullTest(Y, A, W, control = list(verbose=TRUE), out.glm=FALSE, cov.var=FALSE)
+
+
+test.sim.1.sl <- testing.sim(500, 1:10, control = list(), out.glm = TRUE)
+test.sim.1.sl
 
 control = list()
 control <- hte.measure.NullTest.control(control)
@@ -639,13 +715,14 @@ est.psi.prob = function(W,A,Y,W.train=NULL,A.train=NULL,Y.train=NULL,sig.meth='v
 }
 
 load('../HTE_Simulation_Result/testing.rst.1.Rdata')
+load('../HTE_Simulation_Result/testing.rst.2.Rdata')
 
-null.sims <- FALSE
-sim2019rst <- ldply(2000, function(n) {
+null.sims <- TRUE
+sim2019rst.2 <- ldply(c(200, 400, 800, 1000), function(n) {
   ldply(1:500, function(j) {
     # print(j)
     if(j %% 100 == 0) cat(n, j, '\n')
-    seed <- testing.rst.1[(testing.rst.1$n==n) & (testing.rst.1$j==j), "seed"][1]
+    seed <- testing.rst.2[(testing.rst.2$n==n) & (testing.rst.2$j==j), "seed"][1]
     set.seed(seed)
 
     W <- matrix(runif(n*3, 0, 1), ncol=3)
@@ -697,6 +774,22 @@ gamma.summaries.1.luedtke <- ddply(subset(testing.rst.1.luedtke, (type %in% 'Gam
                            cnt = length(stat),
                            # quantile.reject.rate = mean(stat>quantile),
                            pvalue.reject.rate = mean(pvalue<0.05))
+testing.rst.2.luedtke <- sim2019rst.2
+save(testing.rst.2.luedtke, file="testing.rst.2.luedtke.RData")
+gamma.summaries.2.luedtke <- ddply(subset(testing.rst.2.luedtke, (type %in% 'Gamma.stat.2019')),
+                                   .(n, type), summarize,
+                                   na = sum(is.na(stat)),
+                                   cnt = length(stat),
+                                   # quantile.reject.rate = mean(stat>quantile),
+                                   pvalue.reject.rate = mean(pvalue<0.05))
+load("../HTE_Simulation_Result/gamma.summaries.2.RData")
+testing.rst.2.plot <- rbind(gamma.summaries.2[c(1,2,4,5),c("type", "n", "pvalue.reject.rate")],
+                   gamma.summaries.2.luedtke[,c("type", "n", "pvalue.reject.rate")])
+
+ggplot(testing.rst.2.plot, aes(x=n, y=pvalue.reject.rate, group=type, col=type)) +
+  geom_line(aes(linetype=type))+
+  geom_point(aes(shape=type))
+# our testing seem to have lower type I error
 
 ######################################
 # simulation scenario 2 in Luedtke
@@ -877,4 +970,129 @@ control <- hte.measure.NullTest.control(control <- list(pi.SL.library=c('SL.rpar
                                                         mu.SL.library=c('SL.rpart','SL.glm.interaction','SL.glm','SL.earth','SL.nnet')))
 ret <- hteNullTest(Y, A, W, control = control, out.glm = FALSE, cov.var=FALSE)
 
+# simulation for paper
+generate.data <- function(n){
+  beta <- c(0, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
 
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+
+n <- 250
+generate.data(n)
+
+# analysis for simulated data
+pi0.array <- c()
+mu0.array <- c()
+psi0 <- c()
+theta0 <- c()
+for (i in 1:500){
+  beta <- c(0, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  pi0.array[i] <- mean(pi0(W))
+  mu0.array[i] <- mean(mu0(A, W, beta))
+  psi0[i]<- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0[i] <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+}
+
+plot(density(pi0.array))
+plot(density(mu0.array))
+plot(density(psi0))
+plot(density(theta0))
+
+# how to name data sets?
+# ests.sim.1.0.25.w.sl
+# ests - for estimator or CI
+# 1 - for simulated data function
+# 0.25 - for beta parameters in generate.data()
+# w - for wald type CI
+# sl - for superlearner, i.e., out.glm=FALSE
+
+data.dict <- list(ests.sim.1.0.25.w.sl=list(beta=c(0, 0.25)))
+# 1) estimator simulation
+control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+               conf.int = TRUE,
+               conf.int.type = 'Wald')
+tm0 <- proc.time()
+ests.sim.1.0.25.w.sl <-  ests.sim(c(100, 250, 500, 750, 1000), 1:500, control, out.glm=FALSE)
+tm1 <- proc.time()
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+save(ests.sim.1.0.25.w.sl, file="ests.sim.1.0.25.w.sl.RData")
+
+ests.sim.1.0.25.w.sl
+ret <- subset(ests.sim.1.0.25.w.sl,
+              (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
+optional.ret <- subset(ests.sim.1.0.25.w.sl,
+                       (type %in% c('psi.est', 'theta.est', 'psi.plug.in.est', 'psi.one.step.est',
+                       'theta.plug.in.est', 'theta.one.step.est')))[,c("type", "est", "n", "j" , "seed")]
+pars.ret <- subset(ests.sim.1.0.25.w.sl,
+                       (type %in% 'pars'))[,c("n", "j" , "seed", "psi0", "theta0")]
+ests.sim.1 <- join(ret, pars.ret, by=c("n", "j", "seed"))
+ests.sim.2 <- join(optional.ret, pars.ret, by=c("n", "j", "seed"))
+
+psi.summaries.1 <- ddply(subset(ests.sim.1, (type %in% 'psi.est')), .(n, type), summarize, na = sum(is.na(est)),
+                         coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         bias = mean(est - psi0, na.rm=TRUE),
+                         var = var(est, na.rm=TRUE),
+                         mse = mean((est - psi0)^2, na.rm=TRUE))
+
+psi.summaries.2 <- ddply(subset(ests.sim.2, (type %in% c('psi.est', 'psi.plug.in.est', 'psi.one.step.est'))),
+                                .(n, type), summarize, na = sum(is.na(est)),
+                         # coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         bias = mean(est - psi0, na.rm=TRUE),
+                         var = var(est, na.rm=TRUE),
+                         mse = mean((est - psi0)^2, na.rm=TRUE))
+
+library(ggplot2)
+p1 <- ggplot(psi.summaries.1) +
+  geom_line(aes(n, coverage, color=type)) +
+  geom_hline(yintercept=.95)
+
+p2 <- ggplot(psi.summaries.1) +
+  geom_line(aes(n, sqrt(n) * bias, color=type))
+
+p3 <- ggplot(psi.summaries.1) +
+  geom_line(aes(n, n * mse, color=type))
+
+p4 <- ggplot(psi.summaries.1) +
+  geom_line(aes(n, n * var, color=type)) +
+  coord_cartesian(ylim=c(0,1))
+
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, ncol=2)
+
+# 3) testing simulation
+tm0 <- proc.time()
+testing.sim.1.0.25.sl <- testing.sim(1000, 1:10, control = list(), out.glm = FALSE)
+tm1 <- proc.time()
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+save(ests.sim.1.0.25.w.sl, file="ests.sim.1.0.25.w.sl.RData")
+tmp.500 <- testing.sim.1.0.25.sl
+testing.sim.1.0.25.sl
+gamma.summaries.1 <- ddply(subset(testing.sim.1.0.25.sl, (type %in% 'Gamma.stat')),
+                                   .(n, type), summarize,
+                                   na = sum(is.na(stat)),
+                                   cnt = length(stat),
+                                   # quantile.reject.rate = mean(stat>quantile),
+                                   pvalue.reject.rate = mean(pvalue<0.05))
+omega.summaries.1 <- ddply(subset(testing.sim.1.0.25.sl, (type %in% 'Omega.stat')),
+                           .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           # quantile.reject.rate = mean(stat>quantile),
+                           pvalue.reject.rate = mean(pvalue<0.05))
