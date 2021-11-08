@@ -996,7 +996,7 @@ mu0.array <- c()
 psi0 <- c()
 theta0 <- c()
 for (i in 1:500){
-  beta <- c(0, 0.25)
+  beta <- c(0.25, 0.25)
   pi0 <- function(w) 0.5+(w[,1]/3)
   mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
 
@@ -1035,6 +1035,8 @@ cat("tm1-tm0 = ", tm1-tm0, "\n")
 save(ests.sim.1.0.25.w.sl, file="ests.sim.1.0.25.w.sl.RData")
 
 ests.sim.1.0.25.w.sl
+
+load("../HTE_Simulation_Result/ests.sim.1.0.25.w.sl.RData")
 ret <- subset(ests.sim.1.0.25.w.sl,
               (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
 optional.ret <- subset(ests.sim.1.0.25.w.sl,
@@ -1047,6 +1049,7 @@ ests.sim.2 <- join(optional.ret, pars.ret, by=c("n", "j", "seed"))
 
 psi.summaries.1 <- ddply(subset(ests.sim.1, (type %in% 'psi.est')), .(n, type), summarize, na = sum(is.na(est)),
                          coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         cnt = length(type),
                          bias = mean(est - psi0, na.rm=TRUE),
                          var = var(est, na.rm=TRUE),
                          mse = mean((est - psi0)^2, na.rm=TRUE))
@@ -1076,6 +1079,306 @@ p4 <- ggplot(psi.summaries.1) +
 library(gridExtra)
 grid.arrange(p1, p2, p3, p4, ncol=2)
 
+control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+               conf.int = TRUE,
+               conf.int.type = 'Wald')
+generate.data <- function(n){
+  beta <- c(0.25, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+ests.sim <-  function(n_range, j_range, control, generate_func, out.glm=FALSE){
+  ests <- ldply(n_range, function(n) {
+    ldply(j_range, function(j) {
+      cat(n, j, '\n')
+      # if(j %% 100 == 0) cat(n, j, '\n')
+      seed <- sample(1e3:1e8, 1)
+      set.seed(seed)
+
+      # generate simulated data
+      simulated.data <- do.call(generate_func, list(n=n))
+      Y <- simulated.data$Y
+      A <- simulated.data$A
+      W <- simulated.data$W
+
+      # using glm to estimate
+      if (out.glm){
+        prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+        pi.hat <- prop.reg$fitted.values
+        AW <- cbind(A, data.frame(W))
+        mu.reg <- glm(Y ~ ., data=AW, family='binomial')
+        mu.hat <- mu.reg$fitted.values
+        mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                                   data.frame(W)), type = 'response')
+        mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                                   data.frame(W)), type = 'response')
+        mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+        control$pi.hat = pi.hat
+        control$mu.hats = mu.hats
+      }
+
+      # using SuperLearner to estimate
+      est.ret <- htem.estimator(A, W, Y, control = control)
+
+      ret <- label.result(est.ret$ret, n, j, seed)
+      optional.ret <- NULL
+      if(!is.null(est.ret$optional.ret)){
+        optional.ret <- label.result(est.ret$optional.ret, n, j, seed)
+      }
+
+      parameters.ret <- data.frame(type='pars', n=n, j=j, seed=seed,
+                                   psi0=simulated.data$psi0,
+                                   theta0=simulated.data$theta0)
+
+      est.sim.ret <- bind_rows(ret, optional.ret, parameters.ret)
+      return(est.sim.ret)
+    })
+  })
+
+  return(ests)
+}
+tm0 <- proc.time()
+ests.sim.1.25.25.w.sl <-  ests.sim(c(100, 250, 500, 750, 1000), 1:500, control, generate_func=generate.data, out.glm=FALSE)
+tm1 <- proc.time()
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+save(ests.sim.1.25.25.w.sl, file="ests.sim.1.25.25.w.sl.RData")
+
+control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+               conf.int = TRUE,
+               conf.int.type = 'Wald')
+generate.data <- function(n){
+  beta <- c(0.25, 0)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+ests.sim <-  function(n_range, j_range, control, generate_func, out.glm=FALSE){
+  ests <- ldply(n_range, function(n) {
+    ldply(j_range, function(j) {
+      cat(n, j, '\n')
+      # if(j %% 100 == 0) cat(n, j, '\n')
+      seed <- sample(1e3:1e8, 1)
+      set.seed(seed)
+
+      # generate simulated data
+      simulated.data <- do.call(generate_func, list(n=n))
+      Y <- simulated.data$Y
+      A <- simulated.data$A
+      W <- simulated.data$W
+
+      # using glm to estimate
+      if (out.glm){
+        prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+        pi.hat <- prop.reg$fitted.values
+        AW <- cbind(A, data.frame(W))
+        mu.reg <- glm(Y ~ ., data=AW, family='binomial')
+        mu.hat <- mu.reg$fitted.values
+        mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                                   data.frame(W)), type = 'response')
+        mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                                   data.frame(W)), type = 'response')
+        mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+        control$pi.hat = pi.hat
+        control$mu.hats = mu.hats
+      }
+
+      # using SuperLearner to estimate
+      est.ret <- htem.estimator(A, W, Y, control = control)
+
+      ret <- label.result(est.ret$ret, n, j, seed)
+      optional.ret <- NULL
+      if(!is.null(est.ret$optional.ret)){
+        optional.ret <- label.result(est.ret$optional.ret, n, j, seed)
+      }
+
+      parameters.ret <- data.frame(type='pars', n=n, j=j, seed=seed,
+                                   psi0=simulated.data$psi0,
+                                   theta0=simulated.data$theta0)
+
+      est.sim.ret <- bind_rows(ret, optional.ret, parameters.ret)
+      return(est.sim.ret)
+    })
+  })
+
+  return(ests)
+}
+tm0 <- proc.time()
+ests.sim.1.25.0.w.sl <-  ests.sim(c(100, 250, 500, 750, 1000), 1:500, control, generate_func=generate.data, out.glm=FALSE)
+tm1 <- proc.time()
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+save(ests.sim.1.25.0.w.sl, file="ests.sim.1.25.0.w.sl.RData")
+
+control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+               conf.int = TRUE,
+               conf.int.type = 'Wald')
+generate.data <- function(n){
+  beta <- c(0, 0)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+ests.sim <-  function(n_range, j_range, control, generate_func, out.glm=FALSE){
+  ests <- ldply(n_range, function(n) {
+    ldply(j_range, function(j) {
+      cat(n, j, '\n')
+      # if(j %% 100 == 0) cat(n, j, '\n')
+      seed <- sample(1e3:1e8, 1)
+      set.seed(seed)
+
+      # generate simulated data
+      simulated.data <- do.call(generate_func, list(n=n))
+      Y <- simulated.data$Y
+      A <- simulated.data$A
+      W <- simulated.data$W
+
+      # using glm to estimate
+      if (out.glm){
+        prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+        pi.hat <- prop.reg$fitted.values
+        AW <- cbind(A, data.frame(W))
+        mu.reg <- glm(Y ~ ., data=AW, family='binomial')
+        mu.hat <- mu.reg$fitted.values
+        mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                                   data.frame(W)), type = 'response')
+        mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                                   data.frame(W)), type = 'response')
+        mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+        control$pi.hat = pi.hat
+        control$mu.hats = mu.hats
+      }
+
+      # using SuperLearner to estimate
+      est.ret <- htem.estimator(A, W, Y, control = control)
+
+      ret <- label.result(est.ret$ret, n, j, seed)
+      optional.ret <- NULL
+      if(!is.null(est.ret$optional.ret)){
+        optional.ret <- label.result(est.ret$optional.ret, n, j, seed)
+      }
+
+      parameters.ret <- data.frame(type='pars', n=n, j=j, seed=seed,
+                                   psi0=simulated.data$psi0,
+                                   theta0=simulated.data$theta0)
+
+      est.sim.ret <- bind_rows(ret, optional.ret, parameters.ret)
+      return(est.sim.ret)
+    })
+  })
+
+  return(ests)
+}
+tm0 <- proc.time()
+ests.sim.1.0.0.w.sl <-  ests.sim(c(100, 250, 500, 750, 1000), 1:500, control, generate_func=generate.data, out.glm=FALSE)
+tm1 <- proc.time()
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+save(ests.sim.1.0.0.w.sl, file="ests.sim.1.0.0.w.sl.RData")
+
+# 2) Bootstrap simulation
+control = list(est.type = list('psi.est'='hybrid', 'theta.est'='hybrid'),
+               conf.int = TRUE,
+               conf.int.type = 'boot',
+               n.boot = 500)
+generate.data <- function(n){
+  beta <- c(0.25, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+ests.sim <-  function(n_range, j_range, control, generate_func, out.glm=FALSE){
+  ests <- ldply(n_range, function(n) {
+    ldply(j_range, function(j) {
+      cat(n, j, '\n')
+      # if(j %% 100 == 0) cat(n, j, '\n')
+      seed <- sample(1e3:1e8, 1)
+      set.seed(seed)
+
+      # generate simulated data
+      simulated.data <- do.call(generate_func, list(n=n))
+      Y <- simulated.data$Y
+      A <- simulated.data$A
+      W <- simulated.data$W
+
+      # using glm to estimate
+      if (out.glm){
+        prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+        pi.hat <- prop.reg$fitted.values
+        AW <- cbind(A, data.frame(W))
+        mu.reg <- glm(Y ~ ., data=AW, family='binomial')
+        mu.hat <- mu.reg$fitted.values
+        mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                                   data.frame(W)), type = 'response')
+        mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                                   data.frame(W)), type = 'response')
+        mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+        control$pi.hat = pi.hat
+        control$mu.hats = mu.hats
+      }
+
+      # using SuperLearner to estimate
+      est.ret <- htem.estimator(A, W, Y, control = control)
+
+      ret <- label.result(est.ret$ret, n, j, seed)
+      optional.ret <- NULL
+      if(!is.null(est.ret$optional.ret)){
+        optional.ret <- label.result(est.ret$optional.ret, n, j, seed)
+      }
+
+      parameters.ret <- data.frame(type='pars', n=n, j=j, seed=seed,
+                                   psi0=simulated.data$psi0,
+                                   theta0=simulated.data$theta0)
+
+      est.sim.ret <- bind_rows(ret, optional.ret, parameters.ret)
+      return(est.sim.ret)
+    })
+  })
+
+  return(ests)
+}
+tm0 <- proc.time()
+ests.sim.1.25.25.b.sl.1000 <-  ests.sim(c(1000), 1:500, control,
+                                       generate_func=generate.data, out.glm=FALSE)
+tm1 <- proc.time()
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+save(ests.sim.1.25.25.b.sl.1000, file="ests.sim.1.25.25.b.sl.1000.RData")
+
+
 # 3) testing simulation
 tm0 <- proc.time()
 testing.sim.1.0.25.sl <- testing.sim(1000, 1:10, control = list(), out.glm = FALSE)
@@ -1096,3 +1399,214 @@ omega.summaries.1 <- ddply(subset(testing.sim.1.0.25.sl, (type %in% 'Omega.stat'
                            cnt = length(stat),
                            # quantile.reject.rate = mean(stat>quantile),
                            pvalue.reject.rate = mean(pvalue<0.05))
+
+load("../HTE_Simulation_Result/testing.sim.1.25.0.sl.100.RData")
+testing.sim.1.25.0.sl.100
+gamma.summaries.1 <- ddply(subset(testing.sim.1.25.0.sl.100, (type %in% 'Gamma.stat')),
+                           .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           # quantile.reject.rate = mean(stat>quantile),
+                           pvalue.reject.rate = mean(pvalue<0.05))
+omega.summaries.1 <- ddply(subset(testing.sim.1.25.0.sl.100, (type %in% 'Omega.stat')),
+                           .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           # quantile.reject.rate = mean(stat>quantile),
+                           pvalue.reject.rate = mean(pvalue<0.05))
+
+# try parallel computing
+generate.data <- function(n){
+  beta <- c(0, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+
+# testing.sim.1.0.25.sl <- testing.sim(1000, 1:10, control = list(), generate_func=generate.data, out.glm = FALSE)
+test <- mclapply(1:10, testing.sim, n_range=100, control = list(), generate_func=generate.data, out.glm = FALSE)
+
+library(parallel)
+numCores <- detectCores()
+tm0 <- proc.time()
+testing.sim.1.0.25.sl.100 <- mclapply(1:500, testing.sim, n_range=100, control = list(), generate_func=generate.data, out.glm = FALSE, mc.cores = 4)
+tm1 <- proc.time()
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+
+tm0 <- proc.time()
+tm <- system.time(
+  testing.sim.1.0.25.sl.500 <- mclapply(1:500, testing.sim, n_range=500, control = list(), generate_func=generate.data, out.glm = FALSE, mc.cores = 4)
+)
+cat("tm1-tm0 = ", tm1-tm0, "\n")
+cat("tm1-tm0 = ", tm, "\n")
+
+
+tm <- system.time(
+  testing.sim.1.0.25.sl.1000 <- mclapply(1:500, testing.sim, n_range=1000, control = list(), generate_func=generate.data, out.glm = FALSE, mc.cores = 4)
+)
+cat("tm1-tm0 = ", tm, "\n")
+
+save(testing.sim.1.0.25.sl.100, file="testing.sim.1.0.25.sl.100.RData")
+save(testing.sim.1.0.25.sl.500, file="testing.sim.1.0.25.sl.500.RData")
+save(testing.sim.1.0.25.sl.1000, file="testing.sim.1.0.25.sl.1000.RData")
+
+
+tm <- system.time(
+  testing.sim.1.0.25.sl.250 <- mclapply(1:500, testing.sim, n_range=250, control = list(), generate_func=generate.data, out.glm = FALSE, mc.cores = 4)
+)
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.0.25.sl.250, file="testing.sim.1.0.25.sl.250.RData")
+tm <- system.time(
+  testing.sim.1.0.25.sl.750 <- mclapply(1:500, testing.sim, n_range=750, control = list(), generate_func=generate.data, out.glm = FALSE, mc.cores = 4)
+)
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.0.25.sl.750, file="testing.sim.1.0.25.sl.750.RData")
+
+
+#######################################
+generate.data <- function(n){
+  beta <- c(0.25, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+tm <- system.time(
+  testing.sim.1.25.25.sl.750 <- mclapply(1:500, testing.sim, n_range=750, control = list(),
+                                         generate_func=generate.data, out.glm = FALSE, mc.cores = 6)
+)
+
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.25.25.sl.750, file="testing.sim.1.25.25.sl.750.RData")
+
+tm <- system.time(
+  testing.sim.1.25.25.sl.250 <- mclapply(1:500, testing.sim, n_range=250, control = list(),
+                                         generate_func=generate.data, out.glm = FALSE, mc.cores = 6)
+)
+
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.25.25.sl.250, file="testing.sim.1.25.25.sl.250.RData")
+
+tm <- system.time(
+  testing.sim.1.25.25.sl.100 <- mclapply(1:500, testing.sim, n_range=100, control = list(),
+                                         generate_func=generate.data, out.glm = FALSE, mc.cores = 6)
+)
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.25.25.sl.100, file="testing.sim.1.25.25.sl.100.RData")
+
+generate.data <- function(n){
+  beta <- c(0, 0)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+
+tm <- system.time(
+  testing.sim.1.0.0.sl.250 <- mclapply(1:500, testing.sim, n_range=250, control = list(),
+                                         generate_func=generate.data, out.glm = FALSE, mc.cores = 6)
+)
+
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.0.0.sl.250, file="testing.sim.1.0.0.sl.250.RData")
+
+tm <- system.time(
+  testing.sim.1.0.0.sl.100 <- mclapply(1:500, testing.sim, n_range=100, control = list(),
+                                         generate_func=generate.data, out.glm = FALSE, mc.cores = 6)
+)
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.0.0.sl.100, file="testing.sim.1.0.0.sl.100.RData")
+
+tm <- system.time(
+  testing.sim.1.0.0.sl.750 <- mclapply(1:500, testing.sim, n_range=750, control = list(),
+                                         generate_func=generate.data, out.glm = FALSE, mc.cores = 6)
+)
+
+cat("tm1-tm0 = ", tm, "\n")
+save(testing.sim.1.0.0.sl.750, file="testing.sim.1.0.0.sl.750.RData")
+# organizing simulation result
+d1 <- do.call(rbind.data.frame, testing.sim.1.0.25.sl.100)
+d2 <- do.call(rbind.data.frame, testing.sim.1.0.25.sl.250)
+d3 <- do.call(rbind.data.frame, testing.sim.1.0.25.sl.500)
+d4 <- do.call(rbind.data.frame, testing.sim.1.0.25.sl.750)
+d5 <- do.call(rbind.data.frame, testing.sim.1.0.25.sl.1000)
+testing.sim.1.0.25.sl <- bind_rows(d1, d2, d3, d4, d5)
+save(testing.sim.1.0.25.sl, file="testing.sim.1.0.25.sl.RData")
+
+for (index in c(100, 250, 500, 750, 1000)){
+  load(paste("../HTE_Simulation_Result/testing.sim.1.25.0.sl.", as.character(index), ".RData", sep=""))
+}
+testing.sim.1.25.0.sl <- data.frame()
+for (index in c(100, 250, 500, 750, 1000)){
+  testing.sim.1.25.0.sl <- rbind(testing.sim.1.25.0.sl,
+        get(paste("testing.sim.1.25.0.sl.", as.character(index), sep="")))
+}
+save(testing.sim.1.25.0.sl, file="testing.sim.1.25.0.sl.RData")
+
+for (index in c(100, 250, 500, 750, 1000)){
+  load(paste("../HTE_Simulation_Result/testing.sim.1.25.25.sl.", as.character(index), ".RData", sep=""))
+}
+
+
+d1 <- do.call(rbind.data.frame, testing.sim.1.25.25.sl.100)
+d2 <- do.call(rbind.data.frame, testing.sim.1.25.25.sl.250)
+# d3 <- do.call(rbind.data.frame, testing.sim.1.25.25.sl.500)
+d4 <- do.call(rbind.data.frame, testing.sim.1.25.25.sl.750)
+# d5 <- do.call(rbind.data.frame, testing.sim.1.25.25.sl.1000)
+testing.sim.1.25.25.sl <- bind_rows(d1, d2, testing.sim.1.25.25.sl.500, d4, testing.sim.1.25.25.sl.1000)
+
+save(testing.sim.1.25.25.sl, file="testing.sim.1.25.25.sl.RData")
+
+
+for (index in c(100, 250, 500, 750, 1000)){
+  load(paste("../HTE_Simulation_Result/testing.sim.1.0.0.sl.", as.character(index), ".RData", sep=""))
+}
+
+
+d1 <- do.call(rbind.data.frame, testing.sim.1.0.0.sl.100)
+d2 <- do.call(rbind.data.frame, testing.sim.1.0.0.sl.250)
+# d3 <- do.call(rbind.data.frame, testing.sim.1.25.25.sl.500)
+d4 <- do.call(rbind.data.frame, testing.sim.1.0.0.sl.750)
+# d5 <- do.call(rbind.data.frame, testing.sim.1.25.25.sl.1000)
+testing.sim.1.0.0.sl <- bind_rows(d1, d2, testing.sim.1.0.0.sl.500, d4, testing.sim.1.0.0.sl.1000)
+
+save(testing.sim.1.0.0.sl, file="testing.sim.1.0.0.sl.RData")
+
+
+for (index in c(100, 250, 500, 750, 1000)){
+  load(paste("ests.sim.1.25.25.b.sl.", as.character(index), ".RData", sep=""))
+}
+ests.sim.1.25.25.b.sl <- data.frame()
+for (index in c(100, 250, 500, 750, 1000)){
+  ests.sim.1.25.25.b.sl <- rbind(ests.sim.1.25.25.b.sl,
+                                 get(paste("ests.sim.1.25.25.b.sl.", as.character(index), sep="")))
+}
+save(ests.sim.1.25.25.b.sl, file="ests.sim.1.25.25.b.sl.RData")
+
+
+
