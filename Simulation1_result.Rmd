@@ -10,11 +10,23 @@ library(ggplot2)
 library(gridExtra)
 library(plyr)
 library(knitr)
-knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
 ## 0 Simulation setting   
-```{r eval=FALSE, include=FALSE}
+
+$$W_1 \sim Unif(-1,1)$$
+$$W_2 \sim Unif(-1,1)$$
+$$W_3 \sim Bernoulli(0.5)$$
+$$A \sim Bernoulli(\pi_0) \ where \ \pi_0=0.5+\frac{1}{3}W_1$$
+$$Y \sim N(\mu_0,1) \ where \ \mu_0=0.1+\beta_1A+\beta_2(W_1^2+W_3)+W_1+W_2^2$$
+     
+$$\tau(W)=\beta_1+\beta_2(W_1^2+W_3)$$
+
+$$\beta=(\beta_1,\beta_2)\in \{(0,0.25),\ (0.25,0.25), \ (0.25,0),\ (0,0)\}$$
+$$n\in\{100,\ 250, \ 500,\ 750,\ 1000\}$$
+```{r echo=FALSE}
 # 1 beta <- c(0, 0.25)
 # 2 beta <- c(0.25, 0.25)
 # 3 beta <- c(0.25, 0)
@@ -27,6 +39,7 @@ mu0.array <- c()
 psi0 <- c()
 theta0 <- c()
 
+sim.setting.df <- data.frame()
 for (beta in beta_list){
   for (i in 1:500){
     pi0 <- function(w) 0.5+(w[,1]/3)
@@ -41,25 +54,33 @@ for (beta in beta_list){
     psi0[i]<- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
     theta0[i] <- var((mu0(1, W, beta) - mu0(0, W, beta)))
   }
-  p1 <- ggplot(data.frame(pi0=pi0.array)) + 
-    geom_density(aes(pi0)) +
-    ggtitle(label=paste("pi0", paste(beta, collapse = "_")))
+  # p1 <- ggplot(data.frame(pi0=pi0.array)) + 
+  #   geom_density(aes(pi0)) +
+  #   ggtitle(label=paste("pi0", paste(beta, collapse = "_")))
+  # 
+  # p2 <- ggplot(data.frame(mu0=mu0.array)) + 
+  #   geom_density(aes(mu0)) +
+  #   ggtitle(label=paste("mu0", paste(beta, collapse = "_")))
+  # 
+  # p3 <- ggplot(data.frame(psi0=psi0)) + 
+  #   geom_density(aes(psi0)) +
+  #   ggtitle(label=paste("psi0", paste(beta, collapse = "_")))
+  # 
+  # p4 <- ggplot(data.frame(theta0=theta0)) + 
+  #   geom_density(aes(theta0)) +
+  #   ggtitle(label=paste("theta0", paste(beta, collapse = "_")))
+  # 
+  # grid.arrange(p1, p2, p3, p4, ncol=2)
+  sim.setting.df <- rbind(sim.setting.df, 
+                          data.frame(beta=paste("(",paste(beta, collapse=", "),")", sep=""),
+                                     pi0=mean(pi0.array), mu0=mean(mu0.array),
+                                     psi0=mean(psi0), theta0=mean(theta0)))
   
-  p2 <- ggplot(data.frame(mu0=mu0.array)) + 
-    geom_density(aes(mu0)) +
-    ggtitle(label=paste("mu0", paste(beta, collapse = "_")))
-  
-  p3 <- ggplot(data.frame(psi0=psi0)) + 
-    geom_density(aes(psi0)) +
-    ggtitle(label=paste("psi0", paste(beta, collapse = "_")))
-  
-  p4 <- ggplot(data.frame(theta0=theta0)) + 
-    geom_density(aes(theta0)) +
-    ggtitle(label=paste("theta0", paste(beta, collapse = "_")))
-  
-  grid.arrange(p1, p2, p3, p4, ncol=2)
 }
+kable(sim.setting.df, digits = 3, caption="Simulated data distribution under different beta settings")
 ```
+
+
 
 ## 1 Estimators    
    
@@ -67,12 +88,9 @@ for (beta in beta_list){
 
 **Estimator of $\psi_0$**
      
-* plug-in  
-* one-step      
-* hybrid   
      
-```{r eval=FALSE, include=FALSE}
-load("../HTE_Simulation_Result/ests.sim.1.0.25.w.sl.RData")
+```{r echo=FALSE}
+load("../Estimator/ests.sim.1.0.25.w.sl.RData")
 ret <- subset(ests.sim.1.0.25.w.sl,
               (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
 optional.ret <- subset(ests.sim.1.0.25.w.sl,
@@ -92,48 +110,52 @@ psi.summaries <- ddply(subset(ests.sim.1.0.25.w.sl.optional.ret,
 ```
 
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(subset(ests.sim.1.0.25.w.sl.optional.ret, (type %in% 'psi.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
   # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(subset(ests.sim.1.0.25.w.sl.optional.ret, (type %in% 'psi.plug.in.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
   # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(subset(ests.sim.1.0.25.w.sl.optional.ret, (type %in% 'psi.one.step.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
   # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0.25)")
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(psi.summaries) +
-  geom_line(aes(n, sqrt(n) * bias, color=type))
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(psi.summaries) +
-  geom_line(aes(n, n * mse, color=type))
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(psi.summaries) +
   geom_line(aes(n, n * var, color=type)) +
-  coord_cartesian(ylim=c(0,1))
+  theme(legend.key.size = unit(0.1,"line"))
+# +
+#   coord_cartesian(ylim=c(0,1))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0.25)")
 ```
 
 **Estimator of $\theta_0$**
-   
-* plug-in   
-* one-step   
-* hybrid   
+
      
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 theta.summaries <- ddply(subset(ests.sim.1.0.25.w.sl.optional.ret, 
                                 (type %in% c('theta.est', 'theta.plug.in.est', 'theta.one.step.est'))),
                                 .(n, type), summarize, na = sum(is.na(est)),
@@ -143,52 +165,55 @@ theta.summaries <- ddply(subset(ests.sim.1.0.25.w.sl.optional.ret,
                          mse = mean((est - theta0)^2, na.rm=TRUE))
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(subset(ests.sim.1.0.25.w.sl.optional.ret, (type %in% 'theta.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
   # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(subset(ests.sim.1.0.25.w.sl.optional.ret, (type %in% 'theta.plug.in.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
   # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(subset(ests.sim.1.0.25.w.sl.optional.ret, (type %in% 'theta.one.step.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
   # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0.25)")
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(theta.summaries) +
-  geom_line(aes(n, sqrt(n) * bias, color=type))
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(theta.summaries) +
-  geom_line(aes(n, n * mse, color=type))
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(theta.summaries) +
   geom_line(aes(n, n * var, color=type)) +
-  coord_cartesian(ylim=c(0,1))
+  coord_cartesian(ylim=c(0,1)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0.25)")
 ```
 
 
 ### 1.2 $\beta=(0.25, 0.25)$   
 
 **Estimator of $\psi_0$**
+  
      
-* plug-in  
-* one-step      
-* hybrid   
-     
-```{r}
-load("../HTE_Simulation_Result/ests.sim.1.25.25.w.sl.RData")
+```{r echo=FALSE}
+load("../Estimator/ests.sim.1.25.25.w.sl.RData")
 ret <- subset(ests.sim.1.25.25.w.sl,
               (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
 optional.ret <- subset(ests.sim.1.25.25.w.sl,
@@ -208,48 +233,50 @@ psi.summaries <- ddply(subset(ests.sim.1.25.25.w.sl.optional.ret,
 ```
 
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(subset(ests.sim.1.25.25.w.sl.optional.ret, (type %in% 'psi.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
   # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(subset(ests.sim.1.25.25.w.sl.optional.ret, (type %in% 'psi.plug.in.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
   # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(subset(ests.sim.1.25.25.w.sl.optional.ret, (type %in% 'psi.one.step.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
   # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0.25)")
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(psi.summaries) +
-  geom_line(aes(n, sqrt(n) * bias, color=type))
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(psi.summaries) +
-  geom_line(aes(n, n * mse, color=type))
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(psi.summaries) +
   geom_line(aes(n, n * var, color=type)) +
-  coord_cartesian(ylim=c(0,1))
+  # coord_cartesian(ylim=c(0,1)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0.25)")
 ```
 
 **Estimator of $\theta_0$**
-   
-* plug-in   
-* one-step   
-* hybrid   
      
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 theta.summaries <- ddply(subset(ests.sim.1.25.25.w.sl.optional.ret, 
                                 (type %in% c('theta.est', 'theta.plug.in.est', 'theta.one.step.est'))),
                                 .(n, type), summarize, na = sum(is.na(est)),
@@ -259,68 +286,320 @@ theta.summaries <- ddply(subset(ests.sim.1.25.25.w.sl.optional.ret,
                          mse = mean((est - theta0)^2, na.rm=TRUE))
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(subset(ests.sim.1.25.25.w.sl.optional.ret, (type %in% 'theta.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
   # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(subset(ests.sim.1.25.25.w.sl.optional.ret, (type %in% 'theta.plug.in.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
   # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(subset(ests.sim.1.25.25.w.sl.optional.ret, (type %in% 'theta.one.step.est'))) + 
   geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
   # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
-  xlab("n")
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0.25)")
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r echo=FALSE}
 p2 <- ggplot(theta.summaries) +
-  geom_line(aes(n, sqrt(n) * bias, color=type))
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p3 <- ggplot(theta.summaries) +
-  geom_line(aes(n, n * mse, color=type))
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 p4 <- ggplot(theta.summaries) +
   geom_line(aes(n, n * var, color=type)) +
-  coord_cartesian(ylim=c(0,1))
+  # coord_cartesian(ylim=c(0,1)) +
+  theme(legend.key.size = unit(0.1,"line"))
 
 library(gridExtra)
-grid.arrange(p2, p3, p4, ncol=2)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0.25)")
 ```
     
-      
+### 1.3 $\beta=(0.25, 0)$   
+
+**Estimator of $\psi_0$**
+  
+     
+```{r echo=FALSE}
+load("../Estimator/ests.sim.1.25.0.w.sl.RData")
+ret <- subset(ests.sim.1.25.0.w.sl,
+              (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
+optional.ret <- subset(ests.sim.1.25.0.w.sl,
+                       (type %in% c('psi.est', 'theta.est', 'psi.plug.in.est', 'psi.one.step.est',
+                       'theta.plug.in.est', 'theta.one.step.est')))[,c("type", "est", "n", "j" , "seed")]
+pars.ret <- subset(ests.sim.1.25.0.w.sl,
+                       (type %in% 'pars'))[,c("n", "j" , "seed", "psi0", "theta0")]
+ests.sim.1.25.0.w.sl.ret <- join(ret, pars.ret, by=c("n", "j", "seed"))
+ests.sim.1.25.0.w.sl.optional.ret <- join(optional.ret, pars.ret, by=c("n", "j", "seed"))
+psi.summaries <- ddply(subset(ests.sim.1.25.0.w.sl.optional.ret, 
+                                (type %in% c('psi.est', 'psi.plug.in.est', 'psi.one.step.est'))),
+                                .(n, type), summarize, na = sum(is.na(est)),
+                         cnt = length(est),
+                         bias = mean(est - psi0, na.rm=TRUE),
+                         var = var(est, na.rm=TRUE),
+                         mse = mean((est - psi0)^2, na.rm=TRUE))
+```
+
+
+```{r echo=FALSE}
+p2 <- ggplot(subset(ests.sim.1.25.0.w.sl.optional.ret, (type %in% 'psi.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
+  # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(subset(ests.sim.1.25.0.w.sl.optional.ret, (type %in% 'psi.plug.in.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
+  # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(subset(ests.sim.1.25.0.w.sl.optional.ret, (type %in% 'psi.one.step.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
+  # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0)")
+```
+
+```{r echo=FALSE}
+p2 <- ggplot(psi.summaries) +
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(psi.summaries) +
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(psi.summaries) +
+  geom_line(aes(n, n * var, color=type)) +
+  # coord_cartesian(ylim=c(0,1)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0)")
+```
+
+**Estimator of $\theta_0$**
+     
+```{r echo=FALSE}
+theta.summaries <- ddply(subset(ests.sim.1.25.0.w.sl.optional.ret, 
+                                (type %in% c('theta.est', 'theta.plug.in.est', 'theta.one.step.est'))),
+                                .(n, type), summarize, na = sum(is.na(est)),
+                         cnt = length(est),
+                         bias = mean(est - theta0, na.rm=TRUE),
+                         var = var(est, na.rm=TRUE),
+                         mse = mean((est - theta0)^2, na.rm=TRUE))
+```
+
+```{r echo=FALSE}
+p2 <- ggplot(subset(ests.sim.1.25.0.w.sl.optional.ret, (type %in% 'theta.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
+  # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(subset(ests.sim.1.25.0.w.sl.optional.ret, (type %in% 'theta.plug.in.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
+  # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(subset(ests.sim.1.25.0.w.sl.optional.ret, (type %in% 'theta.one.step.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
+  # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0)")
+```
+
+```{r echo=FALSE}
+p2 <- ggplot(theta.summaries) +
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(theta.summaries) +
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(theta.summaries) +
+  geom_line(aes(n, n * var, color=type)) +
+  # coord_cartesian(ylim=c(0,1)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0.25,0)")
+```
+
+
+### 1.4 $\beta=(0, 0)$   
+
+**Estimator of $\psi_0$**
+  
+     
+```{r echo=FALSE}
+load("../Estimator/ests.sim.1.0.0.w.sl.RData")
+ret <- subset(ests.sim.1.0.0.w.sl,
+              (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
+optional.ret <- subset(ests.sim.1.0.0.w.sl,
+                       (type %in% c('psi.est', 'theta.est', 'psi.plug.in.est', 'psi.one.step.est',
+                       'theta.plug.in.est', 'theta.one.step.est')))[,c("type", "est", "n", "j" , "seed")]
+pars.ret <- subset(ests.sim.1.0.0.w.sl,
+                       (type %in% 'pars'))[,c("n", "j" , "seed", "psi0", "theta0")]
+ests.sim.1.0.0.w.sl.ret <- join(ret, pars.ret, by=c("n", "j", "seed"))
+ests.sim.1.0.0.w.sl.optional.ret <- join(optional.ret, pars.ret, by=c("n", "j", "seed"))
+psi.summaries <- ddply(subset(ests.sim.1.0.0.w.sl.optional.ret, 
+                                (type %in% c('psi.est', 'psi.plug.in.est', 'psi.one.step.est'))),
+                                .(n, type), summarize, na = sum(is.na(est)),
+                         cnt = length(est),
+                         bias = mean(est - psi0, na.rm=TRUE),
+                         var = var(est, na.rm=TRUE),
+                         mse = mean((est - psi0)^2, na.rm=TRUE))
+```
+
+
+```{r echo=FALSE}
+p2 <- ggplot(subset(ests.sim.1.0.0.w.sl.optional.ret, (type %in% 'psi.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
+  # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(subset(ests.sim.1.0.0.w.sl.optional.ret, (type %in% 'psi.plug.in.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
+  # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(subset(ests.sim.1.0.0.w.sl.optional.ret, (type %in% 'psi.one.step.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - psi0)), color=type)) +
+  # ggtitle(label=paste("convergence of psi", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0)")
+```
+
+```{r echo=FALSE}
+p2 <- ggplot(psi.summaries) +
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(psi.summaries) +
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(psi.summaries) +
+  geom_line(aes(n, n * var, color=type)) +
+  # coord_cartesian(ylim=c(0,1)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0)")
+```
+
+**Estimator of $\theta_0$**
+     
+```{r echo=FALSE}
+theta.summaries <- ddply(subset(ests.sim.1.0.0.w.sl.optional.ret, 
+                                (type %in% c('theta.est', 'theta.plug.in.est', 'theta.one.step.est'))),
+                                .(n, type), summarize, na = sum(is.na(est)),
+                         cnt = length(est),
+                         bias = mean(est - theta0, na.rm=TRUE),
+                         var = var(est, na.rm=TRUE),
+                         mse = mean((est - theta0)^2, na.rm=TRUE))
+```
+
+```{r echo=FALSE}
+p2 <- ggplot(subset(ests.sim.1.0.0.w.sl.optional.ret, (type %in% 'theta.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
+  # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(subset(ests.sim.1.0.0.w.sl.optional.ret, (type %in% 'theta.plug.in.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
+  # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(subset(ests.sim.1.0.0.w.sl.optional.ret, (type %in% 'theta.one.step.est'))) + 
+  geom_boxplot(aes(as.factor(n), log(1 + sqrt(n) * (est - theta0)), color=type)) +
+  # ggtitle(label=paste("convergence of theta", paste(beta, collapse = "_"))) +
+  xlab("n") +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0)")
+```
+
+```{r echo=FALSE}
+p2 <- ggplot(theta.summaries) +
+  geom_line(aes(n, sqrt(n) * bias, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p3 <- ggplot(theta.summaries) +
+  geom_line(aes(n, n * mse, color=type)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+p4 <- ggplot(theta.summaries) +
+  geom_line(aes(n, n * var, color=type)) +
+  # coord_cartesian(ylim=c(0,1)) +
+  theme(legend.key.size = unit(0.1,"line"))
+
+library(gridExtra)
+grid.arrange(p2, p3, p4, ncol=2, top = "beta=(0,0)")
+```
+
+
+    
 ## 2 Confidence Intervals
 
 ### 2.2 $\beta=(0.25, 0.25)$
 
+The mean of $\psi_0$ is around 0.23.
+\
+
 **Wald-type CI for $\psi$**
 
-```{r}
+```{r echo=FALSE}
 psi.w.summaries <- ddply(subset(ests.sim.1.25.25.w.sl.ret, (type %in% 'psi.est')), .(n, type), 
                          summarize, na = sum(is.na(est)),
                          coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
                          cnt = length(type))
-kable(psi.w.summaries)
+kable(psi.w.summaries, caption="Wald-type CI coverage for psi0")
 ```
 
-```{r}
+```{r echo=FALSE}
 ests.sim.1.25.25.w.sl.ret$psi.coverage <- (ests.sim.1.25.25.w.sl.ret$ll <= ests.sim.1.25.25.w.sl.ret$psi0) & (ests.sim.1.25.25.w.sl.ret$psi0 <= ests.sim.1.25.25.w.sl.ret$ul)
 ggplot(subset(ests.sim.1.25.25.w.sl.ret, (type %in% 'psi.est') & (n %in% c(250, 500, 750, 1000)) & 
                 (psi.coverage ==FALSE))) +
   geom_linerange(mapping = aes(x=j, ymin=ll, ymax=ul)) +
   geom_point(mapping=aes(x=j, y=psi0), size=1, col="red") +
-  facet_wrap(~n, scales='free')
+  facet_wrap(~n, scales='free') + 
+  ggtitle(label="Wald-type CIs failed to cover psi0")
 ```
       
 **Bootstrap CI for $\psi$**
-```{r}
-load("../HTE_Simulation_Result/ests.sim.1.25.25.b.sl.RData")
+```{r echo=FALSE}
+load("../ConfidenceInterval/ests.sim.1.25.25.b.sl.RData")
 ret <- subset(ests.sim.1.25.25.b.sl,
               (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
 pars.ret <- subset(ests.sim.1.25.25.b.sl,
@@ -328,90 +607,95 @@ pars.ret <- subset(ests.sim.1.25.25.b.sl,
 ests.sim.1.25.25.b.sl.ret <- join(ret, pars.ret, by=c("n", "j", "seed"))
 ```
 
-```{r}
+```{r echo=FALSE}
 psi.b.summaries <- ddply(subset(ests.sim.1.25.25.b.sl.ret, (type %in% 'psi.est')), .(n, type), 
                          summarize, na = sum(is.na(est)),
                          coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
                          cnt = length(type))
-kable(psi.b.summaries)
+kable(psi.b.summaries, caption="Bootstrap CI coverage for psi0")
 ```
 
-```{r}
+```{r echo=FALSE}
 ests.sim.1.25.25.b.sl.ret$psi.coverage <- (ests.sim.1.25.25.b.sl.ret$ll <= ests.sim.1.25.25.b.sl.ret$psi0) & (ests.sim.1.25.25.b.sl.ret$psi0 <= ests.sim.1.25.25.b.sl.ret$ul)
 ggplot(subset(ests.sim.1.25.25.b.sl.ret, (type %in% 'psi.est') & (n %in% c(250, 500, 750, 1000)) & 
                 (psi.coverage ==FALSE))) +
   geom_linerange(mapping = aes(x=j, ymin=ll, ymax=ul)) +
   geom_point(mapping=aes(x=j, y=psi0), size=1, col="red") +
-  facet_wrap(~n, scales='free')
+  facet_wrap(~n, scales='free') + 
+  ggtitle(label="Bootstrap CIs failed to cover psi0")
 ```
 
-```{r}
+```{r echo=FALSE}
 ggplot() +
   geom_line(data = psi.w.summaries, aes(n, coverage, colour='wald-type')) +
   geom_line(data = psi.b.summaries, aes(n, coverage, colour='bootstrap')) +
   geom_hline(yintercept=.95) +
-  ggtitle(label="confidence interval coverage for psi")
+  ggtitle(label="Confidence interval coverage for psi0")
 ```
 
+\
+The mean of $\theta_0$ is around 0.021.
+\
+       
 **Wald-type CI for $\theta$** 
    
-```{r}
+```{r echo=FALSE}
 theta.w.summaries <- ddply(subset(ests.sim.1.25.25.w.sl.ret, (type %in% 'theta.est')), .(n, type), 
                          summarize, na = sum(is.na(est)),
                          coverage = mean(ll <= theta0 & theta0 <= ul, na.rm=TRUE),
                          cnt = length(type))
-kable(theta.w.summaries)
+kable(theta.w.summaries, caption="Wald-type CI coverage for theta0")
 ```
 
-```{r}
+```{r echo=FALSE}
 ests.sim.1.25.25.w.sl.ret$theta.coverage <- (ests.sim.1.25.25.w.sl.ret$ll <= ests.sim.1.25.25.w.sl.ret$theta0) & (ests.sim.1.25.25.w.sl.ret$theta0 <= ests.sim.1.25.25.w.sl.ret$ul)
 ggplot(subset(ests.sim.1.25.25.w.sl.ret, (type %in% 'theta.est') & (n %in% c(250, 500, 750, 1000)) & 
                 (theta.coverage ==FALSE))) +
   geom_linerange(mapping = aes(x=j, ymin=ll, ymax=ul)) +
   geom_point(mapping=aes(x=j, y=theta0), size=1, col="red") +
-  facet_wrap(~n, scales='free')
+  facet_wrap(~n, scales='free') + 
+  ggtitle(label="Wald-type CIs failed to cover theta0")
 ```
     
 **Bootstrap CI for $\theta$** 
     
-```{r}
+```{r echo=FALSE}
 theta.b.summaries <- ddply(subset(ests.sim.1.25.25.b.sl.ret, (type %in% 'theta.est')), .(n, type), 
                          summarize, na = sum(is.na(est)),
                          coverage = mean(ll <= theta0 & theta0 <= ul, na.rm=TRUE),
                          cnt = length(type))
-kable(theta.b.summaries)
+kable(theta.b.summaries, caption="Bootstrap CI coverage for theta0")
 ```
 
-```{r}
+```{r echo=FALSE}
 ests.sim.1.25.25.b.sl.ret$theta.coverage <- (ests.sim.1.25.25.b.sl.ret$ll <= ests.sim.1.25.25.b.sl.ret$theta0) & (ests.sim.1.25.25.b.sl.ret$theta0 <= ests.sim.1.25.25.b.sl.ret$ul)
 ggplot(subset(ests.sim.1.25.25.b.sl.ret, (type %in% 'theta.est') & (n %in% c(250, 500, 750, 1000)) & 
                 (theta.coverage ==FALSE))) +
   geom_linerange(mapping = aes(x=j, ymin=ll, ymax=ul)) +
   geom_point(mapping=aes(x=j, y=theta0), size=1, col="red") +
-  facet_wrap(~n, scales='free')
+  facet_wrap(~n, scales='free') + 
+  ggtitle(label="Bootstrap CIs failed to cover theta0")
 ```
 
-```{r}
+```{r echo=FALSE}
 ggplot() +
   geom_line(data = theta.w.summaries, aes(n, coverage, colour='wald-type')) +
   geom_line(data = theta.b.summaries, aes(n, coverage, colour='bootstrap')) +
   geom_hline(yintercept=.95) +
-  ggtitle(label="confidence interval coverage for theta")
+  ggtitle(label="Confidence interval coverage for theta0")
 ``` 
       
 ## 3 Testing      
 
 ### 3.1 $\beta=(0, 0.25)$    
+     
+$$\psi>0,\quad\theta>0$$
 
-
-**Our testing**      
-
-
-```{r}
-load("../HTE_Simulation_Result/testing.sim.1.0.25.sl.RData")
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.0.25.sl.RData")
 ```
    
-```{r include=FALSE}
+```{r echo=FALSE}
 gamma.summaries <- ddply(subset(testing.sim.1.0.25.sl, (type %in% 'Gamma.stat')),
                                    .(n, type), summarize,
                                    na = sum(is.na(stat)),
@@ -425,19 +709,14 @@ omega.summaries <- ddply(subset(testing.sim.1.0.25.sl, (type %in% 'Omega.stat'))
                            # quantile.reject.rate = mean(stat>quantile),
                            reject.rate = mean(pvalue<0.05))
 ```
-\
 
-```{r}
-kable(omega.summaries)
+
+
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.0.25.sl.o.RData")
 ```
 
-**Omnibus testing**  
-
-```{r}
-load("../HTE_Simulation_Result/testing.sim.1.0.25.sl.o.RData")
-```
-
-```{r include=FALSE}
+```{r echo=FALSE}
 gamma.summaries.o <- ddply(subset(testing.sim.1.0.25.sl.o, (type %in% 'Gamma.omnibus')),
                                    .(n, type), summarize,
                                    na = sum(is.na(stat)),
@@ -445,20 +724,86 @@ gamma.summaries.o <- ddply(subset(testing.sim.1.0.25.sl.o, (type %in% 'Gamma.omn
                                    # quantile.reject.rate = mean(stat>quantile),
                                    reject.rate = mean(pvalue<0.05))
 ```
+
+```{r echo=FALSE}
+gamma.summaries$omnibus.reject.rate <- gamma.summaries.o$reject.rate
+kable(gamma.summaries, caption = "Testing for psi under beta=(0, 0.25)")
+```
+\
+```{r echo=FALSE}
+kable(omega.summaries, caption = "Testing for theta under beta=(0, 0.25)")
+```
+
+```{r echo=FALSE}
+p1 <- ggplot(aes(n, reject.rate, color=type), 
+       data=bind_rows(gamma.summaries, gamma.summaries.o)) +
+  geom_point() + geom_line() + 
+  ggtitle(label=expression(paste(beta, "=(0, 0.25)"))) +
+  theme(legend.key.size = unit(0.1,"line"))
+```
+        
+### 3.2 $\beta=(0.25, 0.25)$  
+     
+$$\psi>0,\quad\theta>0$$
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.25.25.sl.RData")
+```
+   
+```{r echo=FALSE}
+gamma.summaries <- ddply(subset(testing.sim.1.25.25.sl, (type %in% 'Gamma.stat')),
+                                   .(n, type), summarize,
+                                   na = sum(is.na(stat)),
+                                   cnt = length(stat),
+                                   # quantile.reject.rate = mean(stat>quantile),
+                                   reject.rate = mean(pvalue<0.05))
+omega.summaries <- ddply(subset(testing.sim.1.25.25.sl, (type %in% 'Omega.stat')),
+                           .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           # quantile.reject.rate = mean(stat>quantile),
+                           reject.rate = mean(pvalue<0.05))
+```
+
+
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.25.25.sl.o.RData")
+```
+
+```{r echo=FALSE}
+gamma.summaries.o <- ddply(subset(testing.sim.1.25.25.sl.o, (type %in% 'Gamma.omnibus')),
+                                   .(n, type), summarize,
+                                   na = sum(is.na(stat)),
+                                   cnt = length(stat),
+                                   # quantile.reject.rate = mean(stat>quantile),
+                                   reject.rate = mean(pvalue<0.05))
+```
+
+```{r echo=FALSE}
+gamma.summaries$omnibus.reject.rate <- gamma.summaries.o$reject.rate
+kable(gamma.summaries, caption = "Testing for psi under beta=(0.25, 0.25)")
+```
 \
 
-```{r}
-gamma.summaries$omnibus.reject.rate <- gamma.summaries.o$reject.rate
-kable(gamma.summaries)
+```{r echo=FALSE}
+kable(omega.summaries, caption = "Testing for theta under beta=(0.25, 0.25)")
+```
+
+```{r echo=FALSE}
+p2 <- ggplot(aes(n, reject.rate, color=type), 
+       data=bind_rows(gamma.summaries, gamma.summaries.o)) +
+  geom_point() + geom_line() + 
+  ggtitle(label=expression(paste(beta, "=(0.25, 0.25)"))) +
+  theme(legend.key.size = unit(0.1,"line"))
 ```
 
 ### 3.3 $\beta=(0.25, 0)$    
-      
-```{r}
-load("../HTE_Simulation_Result/testing.sim.1.25.0.sl.RData")
+          
+$$\psi>0,\quad\theta=0$$ 
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.25.0.sl.RData")
 ```
    
-```{r include=FALSE}
+```{r echo=FALSE}
 gamma.summaries <- ddply(subset(testing.sim.1.25.0.sl, (type %in% 'Gamma.stat')),
                                    .(n, type), summarize,
                                    na = sum(is.na(stat)),
@@ -473,12 +818,89 @@ omega.summaries <- ddply(subset(testing.sim.1.25.0.sl, (type %in% 'Omega.stat'))
                            reject.rate = mean(pvalue<0.05))
 ```
 
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.25.0.sl.o.RData")
+```
+
+```{r echo=FALSE}
+gamma.summaries.o <- ddply(subset(testing.sim.1.25.0.sl.o, (type %in% 'Gamma.omnibus')),
+                                   .(n, type), summarize,
+                                   na = sum(is.na(stat)),
+                                   cnt = length(stat),
+                                   # quantile.reject.rate = mean(stat>quantile),
+                                   reject.rate = mean(pvalue<0.05))
+```
 
               
-```{r}
-kable(gamma.summaries)
+```{r echo=FALSE}
+gamma.summaries$omnibus.reject.rate <- gamma.summaries.o$reject.rate
+kable(gamma.summaries, caption = "Testing for psi under beta=(0.25, 0)")
 ```
 \
-```{r}
-kable(omega.summaries)
+```{r echo=FALSE}
+kable(omega.summaries, caption = "Testing for theta under beta=(0.25, 0)")
+```
+
+```{r echo=FALSE}
+p3 <- ggplot(aes(n, reject.rate, color=type), 
+       data=bind_rows(gamma.summaries, gamma.summaries.o)) +
+  geom_point() + geom_line() + 
+  ggtitle(label=expression(paste(beta, "=(0.25, 0)"))) +
+  theme(legend.key.size = unit(0.1,"line"))
+```
+
+### 3.4 $\beta=(0, 0)$  
+     
+$$\psi=0,\quad\theta=0$$
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.0.0.sl.RData")
+```
+   
+```{r echo=FALSE}
+gamma.summaries <- ddply(subset(testing.sim.1.0.0.sl, (type %in% 'Gamma.stat')),
+                                   .(n, type), summarize,
+                                   na = sum(is.na(stat)),
+                                   cnt = length(stat),
+                                   # quantile.reject.rate = mean(stat>quantile),
+                                   reject.rate = mean(pvalue<0.05))
+omega.summaries <- ddply(subset(testing.sim.1.0.0.sl, (type %in% 'Omega.stat')),
+                           .(n, type), summarize,
+                           na = sum(is.na(stat)),
+                           cnt = length(stat),
+                           # quantile.reject.rate = mean(stat>quantile),
+                           reject.rate = mean(pvalue<0.05))
+```
+
+
+```{r echo=FALSE}
+load("../Testing/testing.sim.1.0.0.sl.o.RData")
+```
+
+```{r echo=FALSE}
+gamma.summaries.o <- ddply(subset(testing.sim.1.0.0.sl.o, (type %in% 'Gamma.omnibus')),
+                                   .(n, type), summarize,
+                                   na = sum(is.na(stat)),
+                                   cnt = length(stat),
+                                   # quantile.reject.rate = mean(stat>quantile),
+                                   reject.rate = mean(pvalue<0.05))
+```
+
+```{r echo=FALSE}
+gamma.summaries$omnibus.reject.rate <- gamma.summaries.o$reject.rate
+kable(gamma.summaries, caption = "Testing for psi under beta=(0, 0)")
+```
+\
+
+```{r echo=FALSE}
+kable(omega.summaries, caption = "Testing for theta under beta=(0, 0)")
+```
+
+```{r echo=FALSE}
+p4 <- ggplot(aes(n, reject.rate, color=type), 
+       data=bind_rows(gamma.summaries, gamma.summaries.o)) +
+  geom_point() + geom_line() + 
+  ggtitle(label=expression(paste(beta, "=(0, 0)"))) + 
+  theme(legend.key.size = unit(0.1,"line"))
+
+grid.arrange(p1, p2, p3, p4, ncol=2)
 ```

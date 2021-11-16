@@ -1301,6 +1301,52 @@ tm1 <- proc.time()
 cat("tm1-tm0 = ", tm1-tm0, "\n")
 save(ests.sim.1.0.0.w.sl, file="ests.sim.1.0.0.w.sl.RData")
 
+######################################################################
+control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+               conf.int = TRUE,
+               conf.int.type = 'Wald')
+load("HTEM_Simulation/Testing/testing.sim.1.25.75.sl.RData")
+generate.data <- function(n){
+  beta <- c(0.25, 0.75)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+seed.data <- create.seed.dict(testing.sim.1.25.75.sl)
+cl <- makeCluster(getOption("cl.cores", 5))
+clusterEvalQ(cl, {
+  library(SuperLearner)
+  library(plyr)
+  library(dplyr)
+})
+clusterExport(cl, c("label.result", "htem.estimator", "hteNullTest", "hte.measure.NullTest.control"),
+              envir=environment())
+ests.sim.1.25.75.w.sl.c <- data.frame()
+for (i in c(100, 250, 500, 750, 1000)){
+  cat(i, '\n')
+  system.time(d1 <- do.call(rbind.data.frame, parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                                        n_range=i, 
+                                                        control=control, 
+                                                        generate_func=generate.data, 
+                                                        seed.data=seed.data, out.glm=FALSE)))
+  ests.sim.1.25.75.w.sl.c <- rbind(ests.sim.1.25.75.w.sl.c, 
+                                   d1)
+}
+stopCluster(cl)
+save(ests.sim.1.25.75.w.sl.c, file="ests.sim.1.25.75.w.sl.c.RData")
+
+###############################
+
+
 # 2) Bootstrap simulation
 control = list(est.type = list('psi.est'='hybrid', 'theta.est'='hybrid'),
                conf.int = TRUE,
@@ -1377,6 +1423,154 @@ ests.sim.1.25.25.b.sl.1000 <-  ests.sim(c(1000), 1:500, control,
 tm1 <- proc.time()
 cat("tm1-tm0 = ", tm1-tm0, "\n")
 save(ests.sim.1.25.25.b.sl.1000, file="ests.sim.1.25.25.b.sl.1000.RData")
+
+
+## for other beta settings
+# beta(0,0)
+load("HTEM_Simulation/Testing/testing.sim.1.0.0.sl.RData")
+generate.data <- function(n){
+  beta <- c(0, 0)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+seed.data <- create.seed.dict(testing.sim.1.0.0.sl)
+cl <- makeCluster(getOption("cl.cores", 5))
+clusterEvalQ(cl, {
+  library(SuperLearner)
+  library(plyr)
+  library(dplyr)
+})
+clusterExport(cl, c("label.result", "htem.estimator", "hteNullTest", "hte.measure.NullTest.control"),
+              envir=environment())
+ests.sim.1.0.0.b.sl.c <- data.frame()
+for (i in c(100, 250, 500, 750, 1000)){
+  system.time(d1 <- do.call(rbind.data.frame, parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                            n_range=i, 
+                                            control=control, 
+                                            generate_func=generate.data, 
+                                            seed.data=seed.data, out.glm=FALSE)))
+  ests.sim.1.0.0.b.sl.c <- rbind(ests.sim.1.0.0.b.sl.c, 
+                                 d1)
+}
+stopCluster(cl)
+save(ests.sim.1.0.0.b.sl.c, file="ests.sim.1.0.0.b.sl.c.RData")
+
+load("HTEM_Simulation/Testing/testing.sim.1.0.25.sl.RData")
+generate.data <- function(n){
+  beta <- c(0, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+seed.data <- create.seed.dict(testing.sim.1.0.25.sl)
+cl <- makeCluster(getOption("cl.cores", 5))
+clusterEvalQ(cl, {
+  library(SuperLearner)
+  library(plyr)
+  library(dplyr)
+})
+clusterExport(cl, c("label.result", "htem.estimator", "hteNullTest", "hte.measure.NullTest.control"),
+              envir=environment())
+ests.sim.1.0.25.b.sl.c <- data.frame()
+for (i in c(100, 250, 500, 750, 1000)){
+  cat(i, '\n')
+  system.time(d1 <- do.call(rbind.data.frame, parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                                        n_range=i, 
+                                                        control=control, 
+                                                        generate_func=generate.data, 
+                                                        seed.data=seed.data, out.glm=FALSE)))
+  ests.sim.1.0.25.b.sl.c <- rbind(ests.sim.1.0.25.b.sl.c, 
+                                 d1)
+}
+stopCluster(cl)
+save(ests.sim.1.0.25.b.sl.c, file="ests.sim.1.0.25.b.sl.c.RData")
+
+load("HTEM_Simulation/Testing/testing.sim.1.25.75.sl.RData")
+generate.data <- function(n){
+  beta <- c(0.25, 0.75)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+seed.data <- create.seed.dict(testing.sim.1.25.75.sl)
+cl <- makeCluster(getOption("cl.cores", 5))
+clusterEvalQ(cl, {
+  library(SuperLearner)
+  library(plyr)
+  library(dplyr)
+})
+clusterExport(cl, c("label.result", "htem.estimator", "hteNullTest", "hte.measure.NullTest.control"),
+              envir=environment())
+ests.sim.1.25.75.b.sl.c <- data.frame()
+for (i in c(100, 250, 500, 750, 1000)){
+  cat(i, '\n')
+  system.time(d1 <- do.call(rbind.data.frame, parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                                        n_range=i, 
+                                                        control=control, 
+                                                        generate_func=generate.data, 
+                                                        seed.data=seed.data, out.glm=FALSE)))
+  ests.sim.1.25.75.b.sl.c <- rbind(ests.sim.1.25.75.b.sl.c, 
+                                  d1)
+}
+stopCluster(cl)
+save(ests.sim.1.25.75.b.sl.c, file="ests.sim.1.25.75.b.sl.c.RData")
+
+ret <- subset(ests.sim.1.25.75.b.sl.c,
+              (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
+pars.ret <- subset(ests.sim.1.25.75.b.sl.c,
+                   (type %in% 'pars'))[,c("n", "j" , "seed", "psi0", "theta0")]
+ests.sim.1.25.75.b.sl.ret <- join(ret, pars.ret, by=c("n", "j", "seed"))
+
+ci.correction.b <- join(subset(ests.sim.1.25.75.b.sl.ret, (type %in% 'psi.est')),
+                        subset(testing.sim.1.25.75.sl, (type %in% 'Gamma.stat'))[,c("pvalue", "n", "j" , "seed")], by=c("n", "j", "seed"))
+
+psi.b.summaries <- ddply(ci.correction.b %>% mutate(ll.c = ifelse(pvalue>0.05, 0, ll)), .(n, type), 
+                         summarize, na = sum(is.na(est)),
+                         coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         coverage.c = mean(ll.c <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         cnt = length(type))
+library(knitr)
+kable(psi.b.summaries, caption="Bootstrap CI coverage for psi0 with correction")
+
+ci.correction.b <- join(subset(ests.sim.1.25.75.b.sl.ret, (type %in% 'theta.est')),
+                        subset(testing.sim.1.25.75.sl, (type %in% 'Omega.stat'))[,c("pvalue", "n", "j" , "seed")], by=c("n", "j", "seed"))
+
+theta.b.summaries <- ddply(ci.correction.b %>% mutate(ll.c = ifelse(pvalue>0.05, 0, ll)), .(n, type), 
+                           summarize, na = sum(is.na(est)),
+                           coverage = mean(ll <= theta0 & theta0 <= ul, na.rm=TRUE),
+                           coverage.c = mean(ll.c <= theta0 & theta0 <= ul, na.rm=TRUE),
+                           cnt = length(type))
+library(knitr)
+kable(theta.b.summaries, caption="Bootstrap CI coverage for theta0 with correction")
+
 
 
 # 3) testing simulation
@@ -1608,5 +1802,678 @@ for (index in c(100, 250, 500, 750, 1000)){
 }
 save(ests.sim.1.25.25.b.sl, file="ests.sim.1.25.25.b.sl.RData")
 
+# parallel computing on windows system
+generate.data <- function(n){
+  beta <- c(0.25, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+library(devtools)
+# load_all()
+devtools::install_github("ruihu51/CausalSim")
 
 
+
+require(CausalSim)
+generate.data <- function(n){
+  beta <- c(0.25, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+hte.measure.NullTest.control <- function(control){
+  control.default = list(pi.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                         mu.SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+                         est.type = list('psi.est'='hybrid', 'theta.est'='hybrid'),
+                         conf.int = FALSE,
+                         conf.int.type = 'Wald',
+                         conf.level = 0.95,
+                         n.boot = 500,
+                         verbose = FALSE)
+  control.names <- names(control)
+  if(!is.null(control.names)) {
+    for (name in control.names) {
+      control.default[[name]] <- control[[name]]
+    }
+  }
+  return(control.default)
+}
+
+# Function to label result
+label.result <- function(ret, n, j, seed){
+  nrows <- dim(ret)[1]
+  ret$n <- rep(n, nrows)
+  ret$j <- rep(j, nrows)
+  ret$seed <- rep(seed, nrows)
+  return(ret)
+}
+
+hteNullTest <- function(Y, A, W, control = list(), out.glm=FALSE, cov.var=FALSE) {
+  
+  # update control parameters
+  control <- hte.measure.NullTest.control(control)
+  n = length(A)
+  
+  if (out.glm){
+    prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+    pi.hat <- prop.reg$fitted.values
+    AW <- cbind(A, data.frame(W))
+    mu.reg <- glm(Y ~ ., data=AW, family='binomial')
+    mu.hat <- mu.reg$fitted.values
+    mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                               data.frame(W)), type = 'response')
+    mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                               data.frame(W)), type = 'response')
+    mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+    control$pi.hat = pi.hat
+    control$mu.hats = mu.hats
+  }
+  
+  if(control$verbose) cat("Estimating...\n")
+  tm0 <- proc.time()
+  # estimated propensity
+  if(is.null(control$pi.hat)){
+    prop.reg <- SuperLearner(Y=A, X = data.frame(W),
+                             newX = data.frame(W),
+                             SL.library = control$pi.SL.library,
+                             family = binomial(),
+                             obsWeights=rep(1,n),
+                             id=1:n)
+    control$pi.hat <- prop.reg$SL.predict
+  }
+  
+  # estimated outcome regression
+  if(is.null(control$mu.hats)){
+    AW <- cbind(A, data.frame(W))
+    if(length(setdiff(Y, c(0,1))) == 0) {
+      family = 'binomial'
+    } else {
+      family = 'gaussian'
+    }
+    mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
+                           newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
+                           SL.library = control$mu.SL.library,
+                           family = family,
+                           obsWeights=rep(1,n),
+                           id=1:n)
+    control$mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
+  }
+  
+  control$mu.hat <- A * control$mu.hats$mu1 + (1-A) * control$mu.hats$mu0
+  
+  # estimated tau
+  tau.hat <- control$mu.hats$mu1 - control$mu.hats$mu0
+  Z.hat <- (2*A - 1) / (A * control$pi.hat + (1-A) * (1-control$pi.hat))
+  
+  # estimated theta
+  gamma.hat <- mean(tau.hat)
+  
+  w.ecdf <- function(w) {
+    vec.leq <- function(x,y) prod(x <= y)
+    return(mean(apply(W, 1, vec.leq, y = w)))
+  }
+  u.vals <- apply(W, 1, w.ecdf)
+  # primitive function
+  if(control$verbose) cat("Computing Gamma and Omega...\n")
+  tm1 <- proc.time()
+  # n.new * 1 vector
+  w.vals <- W
+  Gamma.w.vals <- apply(w.vals, 1, function(w0)
+    mean(apply(W, 1, function(x) prod(x <= w0))*tau.hat))
+  Omega.w.vals <- Gamma.w.vals - gamma.hat * u.vals
+  
+  # nonparametric EIF
+  # n * n.new matrix
+  vec.eq <- function(x,y) prod(x == y)
+  eif.Gamma <- apply(w.vals, 1, function(w0) {
+    (apply(W, 1, function(x) prod(x <= w0))) * (Z.hat * (Y - control$mu.hat) + tau.hat) -
+      Gamma.w.vals[which(as.logical(apply(W, 1, vec.eq, y = w0)))]
+  })
+  eif.Omega <- apply(w.vals, 1, function(w0) {
+    (apply(W, 1, function(x) prod(x <= w0)) - w.ecdf(w0)) * (Z.hat * (Y - control$mu.hat) + tau.hat - gamma.hat) -
+      Omega.w.vals[which(as.logical(apply(W, 1, vec.eq, y = w0)))]
+  })
+  
+  # one-step estimators
+  # n.new * 1 vector
+  Gamma.os.est <- colMeans(eif.Gamma) + Gamma.w.vals
+  Omega.os.est <- colMeans(eif.Omega) + Omega.w.vals
+  
+  # testing procedure
+  if(control$verbose) cat("Computing statistics...\n")
+  tm2 <- proc.time()
+  # test statistics
+  Gamma.stat <- n^(1/2)*max(abs(Gamma.os.est))
+  Omega.stat <- n^(1/2)*max(abs(Omega.os.est))
+  
+  # covariance matrices
+  n.new <- dim(w.vals)[1]
+  if (cov.var){
+    Gamma.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
+      mean(eif.Gamma[,s] * eif.Gamma[,t])
+    }))
+    Omega.cov.var <- sapply(1:n.new, function(s) sapply(1:n.new, function(t) {
+      mean(eif.Omega[,s] * eif.Omega[,t])
+    }))
+    
+    # quantiles
+    tm3 <- proc.time()
+    Gamma.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Gamma.cov.var)
+    Gamma.epsilon.stats <- apply(Gamma.epsilon, 1, function(x) {max(abs(x))})
+    Omega.epsilon <- rmvnorm(n=control$n.boot, mean=rep(0, n.new), sigma = Omega.cov.var)
+    Omega.epsilon.stats <- apply(Omega.epsilon, 1, function(x) {max(abs(x))})
+  }else{
+    tm3 <- proc.time()
+    Gamma.epsilon.stats <- replicate(control$n.boot, max(abs(t(eif.Gamma)%*%rnorm(n.new, 0, 1)/sqrt(n))))
+    Omega.epsilon.stats <- replicate(control$n.boot, max(abs(t(eif.Omega)%*%rnorm(n.new, 0, 1)/sqrt(n))))
+  }
+  
+  Gamma.pvalue <- mean(Gamma.epsilon.stats > Gamma.stat)
+  Gamma.quantile <- unname(quantile(Gamma.epsilon.stats, control$conf.level))
+  Omega.pvalue <- mean(Omega.epsilon.stats > Omega.stat)
+  Omega.quantile <- unname(quantile(Omega.epsilon.stats, control$conf.level))
+  
+  ret <- data.frame(type = 'Gamma.stat', stat = Gamma.stat, pvalue = Gamma.pvalue,
+                    quantile = Gamma.quantile)
+  ret <- rbind(ret,
+               data.frame(type = 'Omega.stat', stat = Omega.stat, pvalue = Omega.pvalue,
+                          quantile = Omega.quantile))
+  tm4 <- proc.time()
+  
+  if (control$verbose){
+    cat("tm1-tm0 = ", tm1-tm0, "\n")
+    cat("tm2-tm1 = ", tm2-tm1, "\n")
+    cat("tm3-tm2 = ", tm3-tm2, "\n")
+    cat("tm4-tm3 = ", tm4-tm3, "\n")
+  }
+  
+  ret
+  
+}
+testing.sim <-  function(n_range, j_range, control, generate_func, out.glm=FALSE){
+  ret <- data.frame()
+  for (n in n_range){
+    for (j in j_range){
+      # if(j %% 100 == 0)
+      cat(n, j, '\n')
+      seed <- sample(1e3:1e8, 1)
+      set.seed(seed)
+      
+      # generate simulated data
+      simulated.data <- do.call(generate_func, list(n=n))
+      Y <- simulated.data$Y
+      A <- simulated.data$A
+      W <- simulated.data$W
+      
+      if (length(ret)>0){
+        ret.tmp <- hteNullTest(Y, A, W, control = control, out.glm = out.glm)
+        
+        ret.tmp$n <- rep(n, 2)
+        ret.tmp$j <- rep(j, 2)
+        ret.tmp$seed <- rep(seed, 2)
+        
+        ret.tmp$psi0 <- rep(simulated.data$psi0, 2)
+        ret.tmp$theta0 <- rep(simulated.data$theta0, 2)
+        
+        ret <- rbind(ret, ret.tmp)
+      }
+      else{
+        ret <- hteNullTest(Y, A, W, control = control, out.glm = out.glm)
+        
+        ret$n <- rep(n, 2)
+        ret$j <- rep(j, 2)
+        ret$seed <- rep(seed, 2)
+        
+        ret$psi0 <- rep(simulated.data$psi0, 2)
+        ret$theta0 <- rep(simulated.data$theta0, 2)
+      }
+    }
+  }
+  
+  return(ret)
+}
+library(parallel)
+install.packages("doParallel")
+library(doParallel)
+cl <- makeCluster(getOption("cl.cores", 4))
+clusterEvalQ(cl, library(SuperLearner))
+clusterExport(cl, c("hteNullTest", "hte.measure.NullTest.control"), 
+              envir=environment())
+system.time({
+  res <- parLapply(cl, 1:100, testing.sim, n_range=500, control=list(), generate_func=generate.data,
+                   out.glm=FALSE)
+})
+res
+stopCluster(cl)
+
+
+###########################################################
+# try to make theta larger
+n <- 500
+pi0.array <- c()
+mu0.array <- c()
+psi0 <- c()
+theta0 <- c()
+
+beta <- c(0.25, 0.75)
+for (i in 1:500){
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  pi0.array[i] <- mean(pi0(W))
+  mu0.array[i] <- mean(mu0(A, W, beta))
+  psi0[i]<- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0[i] <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+}
+
+data.frame(beta=paste("(",paste(beta, collapse=", "),")", sep=""),
+                                   pi0=mean(pi0.array), mu0=mean(mu0.array),
+                                   psi0=mean(psi0), theta0=mean(theta0))
+
+# beta <- c(0.25, 0.75)
+generate.data <- function(n){
+  beta <- c(0.25, 0.75)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+library(parallel)
+library(doParallel)
+cl <- makeCluster(getOption("cl.cores", 7))
+clusterEvalQ(cl, library(SuperLearner))
+clusterExport(cl, c("hteNullTest", "hte.measure.NullTest.control"), 
+              envir=environment())
+system.time({
+  testing.sim.1.25.75.sl.500 <- parLapply(cl, 1:500, testing.sim, n_range=500, 
+                                         control=list(), generate_func=generate.data, out.glm=FALSE)
+})
+system.time({
+  testing.sim.1.25.75.sl.1000 <- parLapply(cl, 1:500, testing.sim, n_range=1000, 
+                                          control=list(), generate_func=generate.data, out.glm=FALSE)
+})
+system.time({
+  testing.sim.1.25.75.sl.750 <- parLapply(cl, 1:500, testing.sim, n_range=750, 
+                                          control=list(), generate_func=generate.data, out.glm=FALSE)
+})
+system.time({
+  testing.sim.1.25.75.sl.100 <- parLapply(cl, 1:500, testing.sim, n_range=100, 
+                                          control=list(), generate_func=generate.data, out.glm=FALSE)
+})
+system.time({
+  testing.sim.1.25.75.sl.250 <- parLapply(cl, 1:500, testing.sim, n_range=250, 
+                                          control=list(), generate_func=generate.data, out.glm=FALSE)
+})
+
+d1 <- do.call(rbind.data.frame, testing.sim.1.25.75.sl.100)
+d2 <- do.call(rbind.data.frame, testing.sim.1.25.75.sl.250)
+d3 <- do.call(rbind.data.frame, testing.sim.1.25.75.sl.500)
+d4 <- do.call(rbind.data.frame, testing.sim.1.25.75.sl.750)
+d5 <- do.call(rbind.data.frame, testing.sim.1.25.75.sl.1000)
+testing.sim.1.25.75.sl <- bind_rows(d1, d2, d3, d4, d5)
+save(testing.sim.1.25.75.sl, file="testing.sim.1.25.75.sl.RData")
+getwd()
+
+omega.summaries <- ddply(subset(testing.sim.1.25.75.sl, (type %in% 'Omega.stat')),
+                         .(n, type), summarize,
+                         na = sum(is.na(stat)),
+                         cnt = length(stat),
+                         # quantile.reject.rate = mean(stat>quantile),
+                         reject.rate = mean(pvalue<0.05))
+
+########################################
+# Wald-type confidence interval with correction
+control = list(est.type = list('psi.est'='all', 'theta.est'='all'),
+               conf.int = TRUE,
+               conf.int.type = 'Wald')
+generate.data <- function(n){
+  beta <- c(0.25, 0.25)
+  pi0 <- function(w) 0.5+(w[,1]/3)
+  mu0 <- function(a, w, beta) 0.1 + beta[1]*a + beta[2]*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+  
+  W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=rbinom(n, size=1, prob=0.5))
+  A <- rbinom(n, size=1, prob=pi0(W))
+  Y <- rnorm(n, mean=mu0(A, W, beta), sd=1)
+  
+  psi0 <- mean((mu0(1, W, beta) - mu0(0, W, beta))^2)
+  theta0 <- var((mu0(1, W, beta) - mu0(0, W, beta)))
+  
+  simulated.data <- list(Y=Y, A=A, W=W, psi0=psi0, theta0=theta0)
+  return(simulated.data)
+}
+ests.sim.testing.correction <-  function(n_range, j_range, control, 
+                                         generate_func, seed.data, out.glm=FALSE){
+  ests <- ldply(n_range, function(n) {
+    ldply(j_range, function(j) {
+      # cat(n, j, '\n')
+      # if(j %% 100 == 0) cat(n, j, '\n')
+      seed <- subset(seed.data, (sample_n==n))[j,"seed"]
+      cat(n, j, seed, '\n')
+      set.seed(seed)
+      
+      # generate simulated data
+      simulated.data <- do.call(generate_func, list(n=n))
+      Y <- simulated.data$Y
+      A <- simulated.data$A
+      W <- simulated.data$W
+      
+      # using glm to estimate
+      if (out.glm){
+        prop.reg <- gam(A ~ s(W[,1]) + s(W[,2]) + s(W[,3]), family = 'binomial')
+        pi.hat <- prop.reg$fitted.values
+        AW <- cbind(A, data.frame(W))
+        mu.reg <- glm(Y ~ ., data=AW, family='binomial')
+        mu.hat <- mu.reg$fitted.values
+        mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1),
+                                                   data.frame(W)), type = 'response')
+        mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0),
+                                                   data.frame(W)), type = 'response')
+        mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+        control$pi.hat = pi.hat
+        control$mu.hats = mu.hats
+      }
+      
+      # using SuperLearner to estimate
+      est.ret <- htem.estimator(A, W, Y, control = control)
+      
+      ret <- label.result(est.ret$ret, n, j, seed)
+      optional.ret <- NULL
+      if(!is.null(est.ret$optional.ret)){
+        optional.ret <- label.result(est.ret$optional.ret, n, j, seed)
+      }
+      
+      parameters.ret <- data.frame(type='pars', n=n, j=j, seed=seed,
+                                   psi0=simulated.data$psi0,
+                                   theta0=simulated.data$theta0)
+      
+      est.sim.ret <- bind_rows(ret, optional.ret, parameters.ret)
+      return(est.sim.ret)
+    })
+  })
+  
+  return(ests)
+}
+
+create.seed.dict <- function(x){
+  x %>%
+    subset(type %in% "Gamma.stat") %>%
+    select(c("n", "j", "seed")) %>%
+    rename(sample_n=n, j=j, seed=seed)
+}
+seed.data <- create.seed.dict(testing.sim.1.25.25.sl)
+
+
+load("HTEM_Simulation/Testing/testing.sim.1.25.25.sl.RData")
+system.time(
+  ests.sim.1.25.25.w.sl.c <-  ests.sim.testing.correction(c(100, 250, 500, 750, 1000), 1:500, 
+                                       control, 
+                                       generate_func=generate.data, 
+                                       seed.data=testing.sim.1.25.25.sl, 
+                                       out.glm=FALSE)
+)
+
+############################### 
+library(parallel)
+library(doParallel)
+cl <- makeCluster(getOption("cl.cores", 7))
+clusterEvalQ(cl, {
+  library(SuperLearner)
+  library(plyr)
+  library(dplyr)
+  })
+clusterExport(cl, c("label.result", "htem.estimator", "hteNullTest", "hte.measure.NullTest.control"),
+              envir=environment())
+system.time({
+  ests.sim.1.25.25.w.sl.c.1000 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                            n_range=1000, 
+                                          control=control, 
+                                          generate_func=generate.data, 
+                                          seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.w.sl.c.750 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                            n_range=750, 
+                                            control=control, 
+                                            generate_func=generate.data, 
+                                            seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.w.sl.c.500 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                           n_range=500, 
+                                           control=control, 
+                                           generate_func=generate.data, 
+                                           seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.w.sl.c.250 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                           n_range=250, 
+                                           control=control, 
+                                           generate_func=generate.data, 
+                                           seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.w.sl.c.100 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                           n_range=100, 
+                                           control=control, 
+                                           generate_func=generate.data, 
+                                           seed.data=seed.data, out.glm=FALSE)
+})
+stopCluster(cl)
+d1 <- do.call(rbind.data.frame, ests.sim.1.25.25.w.sl.c.100)
+d2 <- do.call(rbind.data.frame, ests.sim.1.25.25.w.sl.c.250)
+d3 <- do.call(rbind.data.frame, ests.sim.1.25.25.w.sl.c.500)
+d4 <- do.call(rbind.data.frame, ests.sim.1.25.25.w.sl.c.750)
+d5 <- do.call(rbind.data.frame, ests.sim.1.25.25.w.sl.c.1000)
+ests.sim.1.25.25.w.sl.c <- bind_rows(d1, d2, d3, d4, d5)
+save(ests.sim.1.25.25.w.sl.c, file="ests.sim.1.25.25.w.sl.c.RData")
+
+# reconstruct
+ret <- subset(ests.sim.1.25.25.w.sl.c,
+              (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
+optional.ret <- subset(ests.sim.1.25.25.w.sl.c,
+                       (type %in% c('psi.est', 'theta.est', 'psi.plug.in.est', 'psi.one.step.est',
+                                    'theta.plug.in.est', 'theta.one.step.est')))[,c("type", "est", "n", "j" , "seed")]
+pars.ret <- subset(ests.sim.1.25.25.w.sl.c,
+                   (type %in% 'pars'))[,c("n", "j" , "seed", "psi0", "theta0")]
+ests.sim.1.25.25.w.sl.ret <- join(ret, pars.ret, by=c("n", "j", "seed"))
+ests.sim.1.25.25.w.sl.optional.ret <- join(optional.ret, pars.ret, by=c("n", "j", "seed"))
+
+# combining testing result
+# psi-wald
+ci.correction.w <- join(subset(ests.sim.1.25.25.w.sl.ret, (type %in% 'psi.est')),
+     subset(testing.sim.1.25.25.sl, (type %in% 'Gamma.stat'))[,c("pvalue", "n", "j" , "seed")], by=c("n", "j", "seed"))
+
+psi.w.summaries <- ddply(ci.correction.w %>% mutate(ll.c = ifelse(pvalue>0.05, 0, ll)), .(n, type), 
+                         summarize, na = sum(is.na(est)),
+                         coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         coverage.c = mean(ll.c <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         cnt = length(type))
+library(knitr)
+kable(psi.w.summaries, caption="Wald-type CI coverage for psi0 with correction")
+
+ci.correction.w %>% 
+  mutate(ll.c = ifelse(pvalue>0.05, 0, ll),
+         psi.coverage = (ll <= psi0) & (psi0 <= ul),
+         psi.coverage.c = (ll.c <= psi0) & (psi0 <= ul)) %>%
+  filter((!psi.coverage)|(!psi.coverage.c)) %>%
+  filter(n==1000) %>%
+  select(c(type, est, ll, ul, ll.c, psi0, pvalue))
+
+# psi-bootstrap
+control = list(est.type = list('psi.est'='hybrid', 'theta.est'='hybrid'),
+               conf.int = TRUE,
+               conf.int.type = 'boot',
+               n.boot = 500)
+cl <- makeCluster(getOption("cl.cores", 7))
+clusterEvalQ(cl, {
+  library(SuperLearner)
+  library(plyr)
+  library(dplyr)
+})
+clusterExport(cl, c("label.result", "htem.estimator", "hteNullTest", "hte.measure.NullTest.control"),
+              envir=environment())
+system.time({
+  ests.sim.1.25.25.b.sl.c.1000 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                            n_range=1000, 
+                                            control=control, 
+                                            generate_func=generate.data, 
+                                            seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.b.sl.c.750 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                           n_range=750, 
+                                           control=control, 
+                                           generate_func=generate.data, 
+                                           seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.b.sl.c.500 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                           n_range=500, 
+                                           control=control, 
+                                           generate_func=generate.data, 
+                                           seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.b.sl.c.250 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                           n_range=250, 
+                                           control=control, 
+                                           generate_func=generate.data, 
+                                           seed.data=seed.data, out.glm=FALSE)
+})
+system.time({
+  ests.sim.1.25.25.b.sl.c.100 <- parLapply(cl, 1:500, ests.sim.testing.correction, 
+                                           n_range=100, 
+                                           control=control, 
+                                           generate_func=generate.data, 
+                                           seed.data=seed.data, out.glm=FALSE)
+})
+stopCluster(cl)
+d1 <- do.call(rbind.data.frame, ests.sim.1.25.25.b.sl.c.100)
+d2 <- do.call(rbind.data.frame, ests.sim.1.25.25.b.sl.c.250)
+d3 <- do.call(rbind.data.frame, ests.sim.1.25.25.b.sl.c.500)
+d4 <- do.call(rbind.data.frame, ests.sim.1.25.25.b.sl.c.750)
+d5 <- do.call(rbind.data.frame, ests.sim.1.25.25.b.sl.c.1000)
+ests.sim.1.25.25.b.sl.c <- bind_rows(d1, d2, d3, d4, d5)
+save(ests.sim.1.25.25.b.sl.c, file="ests.sim.1.25.25.b.sl.c.RData")
+
+ret <- subset(ests.sim.1.25.25.b.sl.c,
+              (type %in% c('psi.est', 'theta.est')))[,c("type", "est", "ll", "ul", "n", "j" , "seed")]
+pars.ret <- subset(ests.sim.1.25.25.b.sl.c,
+                   (type %in% 'pars'))[,c("n", "j" , "seed", "psi0", "theta0")]
+ests.sim.1.25.25.b.sl.ret <- join(ret, pars.ret, by=c("n", "j", "seed"))
+
+ci.correction.b <- join(subset(ests.sim.1.25.25.b.sl.ret, (type %in% 'psi.est')),
+                        subset(testing.sim.1.25.25.sl, (type %in% 'Gamma.stat'))[,c("pvalue", "n", "j" , "seed")], by=c("n", "j", "seed"))
+
+psi.b.summaries <- ddply(ci.correction.b %>% mutate(ll.c = ifelse(pvalue>0.05, 0, ll)), .(n, type), 
+                         summarize, na = sum(is.na(est)),
+                         coverage = mean(ll <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         coverage.c = mean(ll.c <= psi0 & psi0 <= ul, na.rm=TRUE),
+                         cnt = length(type))
+library(knitr)
+kable(psi.b.summaries, caption="Bootstrap CI coverage for psi0 with correction")
+
+# theta-wald
+ci.correction.w <- join(subset(ests.sim.1.25.25.w.sl.ret, (type %in% 'theta.est')),
+                        subset(testing.sim.1.25.25.sl, (type %in% 'Omega.stat'))[,c("pvalue", "n", "j" , "seed")], by=c("n", "j", "seed"))
+
+theta.w.summaries <- ddply(ci.correction.w %>% mutate(ll.c = ifelse(pvalue>0.05, 0, ll)), .(n, type), 
+                         summarize, na = sum(is.na(est)),
+                         coverage = mean(ll <= theta0 & theta0 <= ul, na.rm=TRUE),
+                         coverage.c = mean(ll.c <= theta0 & theta0 <= ul, na.rm=TRUE),
+                         cnt = length(type))
+library(knitr)
+kable(theta.w.summaries, caption="Wald-type CI coverage for theta0 with correction")
+
+ci.correction.w %>% 
+  mutate(ll.c = ifelse(pvalue>0.05, 0, ll),
+         theta.coverage = (ll <= theta0) & (theta0 <= ul),
+         theta.coverage.c = (ll.c <= theta0) & (theta0 <= ul)) %>%
+  filter((!theta.coverage)&(theta.coverage.c)) %>%
+  filter(n==1000) %>%
+  select(c(type, est, ll, ul, ll.c, theta0, pvalue, theta.coverage, theta.coverage.c))
+
+# theta-bootstrap
+ci.correction.b <- join(subset(ests.sim.1.25.25.b.sl.ret, (type %in% 'theta.est')),
+                        subset(testing.sim.1.25.25.sl, (type %in% 'Omega.stat'))[,c("pvalue", "n", "j" , "seed")], by=c("n", "j", "seed"))
+
+theta.b.summaries <- ddply(ci.correction.b %>% mutate(ll.c = ifelse(pvalue>0.05, 0, ll)), .(n, type), 
+                         summarize, na = sum(is.na(est)),
+                         coverage = mean(ll <= theta0 & theta0 <= ul, na.rm=TRUE),
+                         coverage.c = mean(ll.c <= theta0 & theta0 <= ul, na.rm=TRUE),
+                         cnt = length(type))
+library(knitr)
+kable(theta.b.summaries, caption="Bootstrap CI coverage for theta0 with correction")
+
+ests.sim.1.25.25.b.sl.ret %>%
+  subset((type %in% 'theta.est') & (n %in% c(250, 500, 750, 1000))) %>% 
+  mutate(theta.coverage = (ll <= theta0) & (theta0 <= ul)) %>%
+  filter(!theta.coverage) %>%
+  select(c(type, est, ll, ul, theta0, theta.coverage, n)) %>%
+  group_by(n) %>%
+  summarise(n())
+
+ests.sim.1.25.25.b.sl.ret %>%
+  subset((type %in% 'theta.est') & (n %in% c(250, 500, 750, 1000))) %>% 
+  mutate(theta.coverage = ((ll <= theta0) & (theta0 <= ul))) %>%
+  filter(!theta.coverage) %>%
+  ggplot()+
+  geom_linerange(mapping = aes(x=j, ymin=ll, ymax=ul)) +
+  # geom_point(mapping=aes(x=j, y=theta0), size=1, col="red") +
+  facet_wrap(~n, scales='free') + 
+  ggtitle(label="Bootstrap CIs failed to cover theta0")                                                             
+
+ests.sim.1.25.25.b.sl.ret %>%
+  subset((type %in% 'theta.est') & (n %in% c(250))) %>% 
+  mutate(theta.coverage = ((ll <= theta0) & (theta0 <= ul))) %>%
+  arrange(theta.coverage) %>%
+  mutate(ll=ifelse(theta.coverage, -1, ll),
+         ul=ifelse(theta.coverage, -1, ul),
+         ranking = rank(theta.coverage, ties.method = 'first')) %>%
+  # filter(!theta.coverage) %>%
+  ggplot()+
+  geom_linerange(mapping = aes(x=ranking, ymin=ll, ymax=ul)) +
+  ylim(c(0,0.6))
+
+ests.sim.1.25.25.b.sl.ret %>%
+  subset((type %in% 'theta.est') & (n %in% c(1000))) %>% 
+  mutate(theta.coverage = ((ll <= theta0) & (theta0 <= ul))) %>%
+  arrange(theta.coverage) %>%
+  mutate(ll=ifelse(theta.coverage, -1, ll),
+         ul=ifelse(theta.coverage, -1, ul),
+         ranking = rank(theta.coverage, ties.method = 'first')) %>%
+  # filter(!theta.coverage) %>%
+  ggplot()+
+  geom_linerange(mapping = aes(x=ranking, ymin=ll, ymax=ul)) +
+  ylim(c(0,0.2))
