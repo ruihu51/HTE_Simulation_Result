@@ -173,6 +173,16 @@ var((tau.hat-gamma.hat) * (Y - control$mu.hat))
 var(tau.hat*(Y - control$mu.hat) - gamma.hat*(Y - control$mu.hat))
 var(tau.hat*(Y - control$mu.hat)) + var(gamma.hat*(Y - control$mu.hat)) -
   2*cov(tau.hat*(Y - control$mu.hat), gamma.hat*(Y - control$mu.hat))
+var(tau.hat*Y)
+var(gamma.hat*Y)
+var(tau.hat*control$mu.hat)
+var(gamma.hat*control$mu.hat)
+
+var(Y*control$mu.hats$mu1)
+var(Y*control$mu.hats$mu0)
+var(A*control$mu.hats$mu1^2)
+var((1-A)*control$mu.hats$mu0^2)
+var(control$mu.hats$mu1*control$mu.hats$mu0*(2*A-1))
 
 # b) estimate mu1.hat and mu0.hat separately
 theta.eif.hat2 <- 2 * (tau.hat2-mean(tau.hat2)) * (Y - mu.hat2) * Z.hat + (tau.hat2-mean(tau.hat2))^2
@@ -186,10 +196,27 @@ var(tau.hat2* (Y - mu.hat2)-mean(tau.hat2) * (Y - mu.hat2))
 var(tau.hat2* (Y - mu.hat2)) + var(mean(tau.hat2) * (Y - mu.hat2)) -
   2*cov(tau.hat2* (Y - mu.hat2), mean(tau.hat2) * (Y - mu.hat2))
 
+var(Y*mu1.hat2)
+
 # c)
 theta.eif <- 2 * (tau0-gamma0) * (Y - mu0(A, W, beta)) * Z0 + (tau0-gamma0)^2
 sd(theta.eif)
 var(theta.eif)
+
+var((tau0-gamma0) * (Y - mu0(A, W, beta)))
+
+var(tau0*Y)
+var(gamma0*Y)
+var(tau0*mu0(A, W, beta))
+var(gamma0*mu0(A, W, beta))
+
+var(Y*mu1.0)
+var(Y*mu0.0)
+var(A*mu1.0^2)
+var((1-A)*mu0.0^2)
+var(mu1.0*mu0.0*(2*A-1))
+
+
 var(2 * (tau0-gamma0) * (Y - mu0(A, W, beta)) * Z0 + (tau0-gamma0)^2)
 var(2 * (tau0-gamma0) * (Y - mu0(A, W, beta)) * Z0) + var((tau0-gamma0)^2) + 2*cov(2 * (tau0-gamma0) * (Y - mu0(A, W, beta)) * Z0, (tau0-gamma0)^2)
 var(2 * (tau0) * (Y - mu0(A, W, beta)) * Z0)
@@ -218,3 +245,4 @@ theta.one.step.est <- mean(2 * (tau.hat-gamma.hat) * (Y - control$mu.hat) * Z.ha
 mean(2 * (tau.hat2-gamma.hat2) * (Y - mu.hat2) * Z.hat + (tau.hat2-gamma.hat2)^2)
 # c)
 mean(2 * (tau0-gamma0) * (Y - mu0(A, W, beta)) * Z0 + (tau0-gamma0)^2)
+sd(2 * (tau0-gamma0) * (Y - mu0(A, W, beta)) * Z0 + (tau0-gamma0)^2)
