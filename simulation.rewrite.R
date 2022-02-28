@@ -91,12 +91,33 @@ gam.model <- as.formula("Y ~ s(W1, 4) + s(W2, 4) + s(W1,4):A + s(W2,4):A + A*W3"
 gam.model <- as.formula("Y ~ W1 + I(W2^2) + I(W1^2):A + A*W3")
 gam.model <- as.formula("Y ~ s(W1, 2) + lo(W2, span=0.5) + lo(W1, span=0.5):A + lo(W2, span=0.5):A + A*W3") # gam3
 gam.model <- as.formula("Y ~ s(W1, 2) + I(W2^2) + I(W1^2):A + s(W1, 2):A + A*W3") # gam4
+gam.model <- as.formula("Y ~ s(W1, df=4) + s(W2, df=4) + I(W1^2):A + W2:A + A*W3") # GAM5
 
 mu.reg <- gam::gam(gam.model, data = AW, family = 'gaussian', control = gam::gam.control(maxit = 30, bf.maxit = 30))
 plot(c(1:2000), mu.reg$smooth[,2])
 points(c(1:2000), W$W2^2)
 
-# mu.reg <- earth::earth(x = data.frame(cbind(A, W)), y = Y, degree = 2, penalty = -1)
+mu.reg$coefficients
+plot(mu.reg)
+plot(W$W2, Y)
+
+x <- W$W2
+y <- Y
+ss1<-smooth.spline(x,y,df=3)
+ss2<-smooth.spline(x,y,df=15)
+ss<-smooth.spline(x,y)
+plot(x,y)
+lines(ss1$x,ss1$y,col="blue",lwd=2)
+lines(ss2$x,ss2$y,col="yellow",lwd=2,lty=2)
+lines(ss$x,ss$y,col="red",lwd=2)
+
+plot(W$W2, mu.reg$smooth[,2])
+plot(W$W1, mu.reg$smooth[,1])
+
+gam.s.ret <- gam.s(W$W2, Y, df=4)
+
+mu.reg <- earth::earth(x = data.frame(cbind(A, W)), y = Y, degree = 2, penalty = -1)
+mu.reg <- earth::earth(x = data.frame(cbind(A, W)), y = Y, degree = 2, penalty = 8)
 mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
 mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
 mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
@@ -271,24 +292,24 @@ for (j in 1:1000){
   # mu.reg  <- glm(Y ~ ., data=AW, family='gaussian')
   # mu.reg  <- glm(Y ~ A + A*W1 + W2 + W3, data=AW, family='gaussian')
   # mu.reg <- glm(Y ~ .^2, data = AW, family = 'gaussian')
-  # gam.model <- as.formula("Y ~ s(W1, 2) + I(W2^2) + I(W1^2):A + s(W1, 2):A + A*W3")
-  # mu.reg <- gam::gam(gam.model, data = AW, family = 'gaussian', control = gam::gam.control(maxit = 50, bf.maxit = 50))
+  gam.model <- as.formula("Y ~ s(W1, df=4) + s(W2, df=4) + I(W1^2):A + W2:A + A*W3")
+  mu.reg <- gam::gam(gam.model, data = AW, family = 'gaussian', control = gam::gam.control(maxit = 50, bf.maxit = 50))
   #mu.reg <-  lm(Y ~ A + W)
   # mu.hat <- mu.reg$fitted.values
-  # mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
-  # mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
-  # mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+  mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
+  mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
+  mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
 
   ## a.2 superlearner
-  learners = create.Learner("SL.earth", params = list(penalty=-1))
-  mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
-                        newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
-                        # SL.library = c("SL.earth"),
-                        SL.library = c("SL.earth", learners$names),
-                        family = 'gaussian',
-                        obsWeights=rep(1,n),
-                        id=1:n)
-  mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
+  # learners = create.Learner("SL.earth", params = list(penalty=-1))
+  # mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
+  #                       newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
+  #                       # SL.library = c("SL.earth"),
+  #                       SL.library = c("SL.earth", learners$names),
+  #                       family = 'gaussian',
+  #                       obsWeights=rep(1,n),
+  #                       id=1:n)
+  # mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
   mu.hat <- A * mu.hats$mu1 + (1-A) * mu.hats$mu0
 
   tau.hat <- mu.hats$mu1 - mu.hats$mu0
@@ -371,7 +392,7 @@ for (j in 1:1000){
 
 # save simulation data
 
-est.sim.rst.redo4.11 <- data.frame(
+est.sim.rst.redo4.gam5 <- data.frame(
   seed = seed.list,
   n = rep(2000, 1000),
   psi.one.step.est = psi.one.step.est.list,
@@ -394,7 +415,7 @@ est.sim.rst.redo4.11 <- data.frame(
 save(est.sim.rst.redo4.8, file="est.sim.rst.redo4.8.RData")
 
 # analysis
-rst <- est.sim.rst.redo4.11
+rst <- est.sim.rst.redo4.gam5
 psi0
 # 1) bias
 # psi
