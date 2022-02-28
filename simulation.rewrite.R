@@ -17,7 +17,7 @@ pi0 <- function(w) expit(0.5+(w[,1]/3))
 # mu0 <- function(a, w) 0.1 + 0.2*a + 0.5*w[,1] - 0.3*w[,2] + 0.1*w[,3]
 # mu0 <- function(a, w) 0.1 + 0.2*a + 0.5*w[,1]^2 - 0.3*w[,2] + 0.1*w[,3]
 # mu0 <- function(a, w) 0.1 + 0.2*a + 0.5*a*w[,1] - 0.3*w[,2] + 0.1*w[,3]
-mu0 <- function(a, w, beta) 0.1 + 0.25*a + 0.75*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
+mu0 <- function(a, w) 0.1 + 0.25*a + 0.75*a*(w[,1]^2+w[,3]) + w[,1] + w[,2]^2
 
 set.seed(95359812)
 # W <- data.frame(W1=runif(n, -1, 1), W2=runif(n, -1, 1), W3=runif(n, -1, 1))
@@ -84,23 +84,47 @@ mu.reg <- glm(Y ~ .^2, data = AW, family = 'gaussian')
 #mu.reg <-  lm(Y ~ A + W)
 # mu.hat <- mu.reg$fitted.values
 # gam.model <- as.formula("Y ~ s(W1, 2) + s(W2, 2) + s(W1):A + s(W2):A + A*W3")
-# mu.reg <- gam::gam(gam.model, data = AW, family = 'gaussian', control = gam::gam.control(maxit = 50, bf.maxit = 50))
-mu.reg <- earth::earth(x = data.frame(cbind(A, W)), y = Y, degree = 2, penalty = -1)
+# fit.gam <- gam::gam(gam.model, data = X, family = family, control = gam::gam.control(maxit = 50, bf.maxit = 50), weights = obsWeights)
+gam.model <- as.formula("Y ~ s(W1, 2) + s(W2, 2) + s(W1):A + s(W2):A + A*W3")
+gam.model <- as.formula("Y ~ s(W1, 1) + s(W2, 5) + s(W1,2):A + s(W2,1):A + A*W3")
+gam.model <- as.formula("Y ~ s(W1, 4) + s(W2, 4) + s(W1,4):A + s(W2,4):A + A*W3")
+gam.model <- as.formula("Y ~ W1 + I(W2^2) + I(W1^2):A + A*W3")
+gam.model <- as.formula("Y ~ s(W1, 2) + lo(W2, span=0.5) + lo(W1, span=0.5):A + lo(W2, span=0.5):A + A*W3") # gam3
+gam.model <- as.formula("Y ~ s(W1, 2) + I(W2^2) + I(W1^2):A + s(W1, 2):A + A*W3") # gam4
+
+mu.reg <- gam::gam(gam.model, data = AW, family = 'gaussian', control = gam::gam.control(maxit = 30, bf.maxit = 30))
+plot(c(1:2000), mu.reg$smooth[,2])
+points(c(1:2000), W$W2^2)
+
+# mu.reg <- earth::earth(x = data.frame(cbind(A, W)), y = Y, degree = 2, penalty = -1)
 mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
 mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
 mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+names(mu.hats) <- c("mu1", "mu0")
+
+# mean square error
+mean((mu.reg$fitted.values - mu0(A, W))^2)
+mean((mu1.hat - mu0(1, W))^2)
+mean((mu0.hat - mu0(0, W))^2)
+
 
 ## a.2 superlearner
 learners = create.Learner("SL.earth", params = list(penalty=-1))
 mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
                        newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
-                       # SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-                       SL.library = c("SL.glm.interaction", learners$names),
+                       SL.library = c("SL.earth"),
+                       # SL.library = c("SL.glm.interaction", "SL.gam.interaction", learners$names),
                        family = 'gaussian',
                        obsWeights=rep(1,n),
                        id=1:n)
 mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
 mu.hat <- A * mu.hats$mu1 + (1-A) * mu.hats$mu0
+
+# mean square error
+
+# mean((mu.reg$fitted.values - mu0(A, W))^2)
+mean((mu.hats$mu1 - mu0(1, W))^2)
+mean((mu.hats$mu0 - mu0(0, W))^2)
 
 tau.hat <- mu.hats$mu1 - mu.hats$mu0
 Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
@@ -242,11 +266,13 @@ for (j in 1:1000){
   # 2) estimated outcome regression
   # a) estimate mu1 and mu0 in one model
   ## a.1 glm
-  # AW <- cbind(data.frame(Y=Y, A=A), data.frame(W))
+  AW <- cbind(data.frame(Y=Y, A=A), data.frame(W))
 
   # mu.reg  <- glm(Y ~ ., data=AW, family='gaussian')
   # mu.reg  <- glm(Y ~ A + A*W1 + W2 + W3, data=AW, family='gaussian')
   # mu.reg <- glm(Y ~ .^2, data = AW, family = 'gaussian')
+  # gam.model <- as.formula("Y ~ s(W1, 2) + I(W2^2) + I(W1^2):A + s(W1, 2):A + A*W3")
+  # mu.reg <- gam::gam(gam.model, data = AW, family = 'gaussian', control = gam::gam.control(maxit = 50, bf.maxit = 50))
   #mu.reg <-  lm(Y ~ A + W)
   # mu.hat <- mu.reg$fitted.values
   # mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
@@ -257,8 +283,8 @@ for (j in 1:1000){
   learners = create.Learner("SL.earth", params = list(penalty=-1))
   mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
                         newX = rbind(data.frame(cbind(A=1, W)), data.frame(cbind(A=0, W))),
-                        # SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-                        SL.library = c("SL.glm.interaction", learners$names),
+                        # SL.library = c("SL.earth"),
+                        SL.library = c("SL.earth", learners$names),
                         family = 'gaussian',
                         obsWeights=rep(1,n),
                         id=1:n)
@@ -283,30 +309,30 @@ for (j in 1:1000){
 
   # b) estimate mu1 and mu0 separately
   ## b.1 glm
-  # AW1 <- cbind(data.frame(Y=Y[which(A==1)]), data.frame(W[which(A==1),]))
-  # mu1.reg  <- glm(Y ~ ., data=AW1, family='gaussian')
-  # mu1.hat2 <- predict(mu1.reg, newdata = data.frame(W), type = 'response')
-  # AW0 <- cbind(data.frame(Y=Y[which(A==0)]), data.frame(W[which(A==0),]))
-  # mu0.reg  <- glm(Y ~ ., data=AW0, family='gaussian')
-  # mu0.hat2 <- predict(mu0.reg, newdata = data.frame(W), type = 'response')
+  AW1 <- cbind(data.frame(Y=Y[which(A==1)]), data.frame(W[which(A==1),]))
+  mu1.reg  <- glm(Y ~ ., data=AW1, family='gaussian')
+  mu1.hat2 <- predict(mu1.reg, newdata = data.frame(W), type = 'response')
+  AW0 <- cbind(data.frame(Y=Y[which(A==0)]), data.frame(W[which(A==0),]))
+  mu0.reg  <- glm(Y ~ ., data=AW0, family='gaussian')
+  mu0.hat2 <- predict(mu0.reg, newdata = data.frame(W), type = 'response')
 
   ## b.2 superlearner
-  mu0.reg <- SuperLearner(Y=Y[which(A==0)], X = data.frame(W[which(A==0),]),
-                          newX = data.frame(W),
-                          # SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-                          SL.library = c("SL.glm"),
-                          family = 'gaussian',
-                          obsWeights=rep(1,length(which(A==0))),
-                          id=1:length(which(A==0)))
-  mu0.hat2 <- mu0.reg$SL.predict
-  mu1.reg <- SuperLearner(Y=Y[which(A==1)], X = data.frame(W[which(A==1),]),
-                          newX = data.frame(W),
-                          # SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
-                          SL.library = c("SL.glm"),
-                          family = 'gaussian',
-                          obsWeights=rep(1,length(which(A==1))),
-                          id=1:length(which(A==1)))
-  mu1.hat2 <- mu1.reg$SL.predict
+  # mu0.reg <- SuperLearner(Y=Y[which(A==0)], X = data.frame(W[which(A==0),]),
+  #                         newX = data.frame(W),
+  #                         # SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+  #                         SL.library = c("SL.glm"),
+  #                         family = 'gaussian',
+  #                         obsWeights=rep(1,length(which(A==0))),
+  #                         id=1:length(which(A==0)))
+  # mu0.hat2 <- mu0.reg$SL.predict
+  # mu1.reg <- SuperLearner(Y=Y[which(A==1)], X = data.frame(W[which(A==1),]),
+  #                         newX = data.frame(W),
+  #                         # SL.library = c("SL.mean", "SL.glm", "SL.gam", "SL.earth"),
+  #                         SL.library = c("SL.glm"),
+  #                         family = 'gaussian',
+  #                         obsWeights=rep(1,length(which(A==1))),
+  #                         id=1:length(which(A==1)))
+  # mu1.hat2 <- mu1.reg$SL.predict
 
   mu.hat2 <- A * mu1.hat2 + (1-A) * mu0.hat2
   tau.hat2 <- mu1.hat2 - mu0.hat2
@@ -345,7 +371,7 @@ for (j in 1:1000){
 
 # save simulation data
 
-est.sim.rst.redo4.4 <- data.frame(
+est.sim.rst.redo4.11 <- data.frame(
   seed = seed.list,
   n = rep(2000, 1000),
   psi.one.step.est = psi.one.step.est.list,
@@ -365,10 +391,10 @@ est.sim.rst.redo4.4 <- data.frame(
   theta.se2 = theta.se2.list,
   theta.est2 = theta.est2.list
 )
-save(est.sim.rst.redo4.3, file="est.sim.rst.redo4.3.RData")
+save(est.sim.rst.redo4.8, file="est.sim.rst.redo4.8.RData")
 
 # analysis
-rst <- est.sim.rst.redo4.4
+rst <- est.sim.rst.redo4.11
 psi0
 # 1) bias
 # psi
@@ -418,7 +444,7 @@ SL.gam.interaction <- function(Y, X, newX, family, obsWeights, id, deg.gam = 2, 
   if("mgcv" %in% loadedNamespaces()) warning("mgcv and gam packages are both in use. You might see an error because both packages use the same function names.")
   # create the formula for gam with a spline for each continuous variable
   cts.x <- apply(X, 2, function(x) (length(unique(x)) > cts.num))
-  gam.model <- as.formula("Y ~ s(W1, 2) + s(W2, 2) + s(W1):A + s(W2):A + A*W3")
+  gam.model <- as.formula("Y ~ s(W1, 4) + s(W2, 4) + s(W1, 4):A + s(W2, 4):A + A*W3")
   fit.gam <- gam::gam(gam.model, data = X, family = family, control = gam::gam.control(maxit = 50, bf.maxit = 50), weights = obsWeights)
   if(packageVersion('gam') >= 1.15) {
     pred <- gam::predict.Gam(fit.gam, newdata = newX, type = "response") # updated gam class in version 1.15
