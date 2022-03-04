@@ -1,0 +1,218 @@
+---
+title: "Simulation.rewrite.rst"
+# geometry: margin=0.5cm
+output:
+  pdf_document: default
+---
+
+```{R include=FALSE}
+library(SuperLearner)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(gridExtra)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+## 1 Scenario 1
+       
+* $W_1$, $W_2$ and $W_3$ are all continuous random variables
+* no interaction term in $Y \sim A+W$, i.e., $\tau(W)$ is a constant
+
+$$W_1 \sim Unif(-1,1)$$
+$$W_2 \sim Unif(-1,1)$$
+$$W_3 \sim Unif(-1,1)$$
+$$A \sim Bernoulli(\pi_0) \ where \ \pi_0=expit(0.5+\frac{1}{3}W_1)$$
+$$Y \sim N(\mu_0,1)$$
+$$\mu_0(A,W)=0.1+0.2*A+0.5*W_1-0.3*W_2+0.1*W_3$$
+$$\mu_0(1,W)=0.3+0.5*W_1-0.3*W_2+0.1*W_3$$
+$$\mu_0(0,W)=0.1+0.5*W_1-0.3*W_2+0.1*W_3$$
+$$\tau(W)=0.2$$
+$$\psi_0=0.04$$
+$$\theta_0=0$$
+```{r echo=TRUE}
+# glm: glm(Y ~ ., data=AW, family='gaussian')
+# earth: SL.library = c("SL.earth")
+```
+
+$$rmse=\frac{\sqrt{\sum(\hat{\mu}-\mu_0)^2}}{\sqrt{n}}$$
+```{r echo=FALSE, fig.width=10, fig.height=4}
+load("rst.s1.glm.RData")
+load("rst.s1.earth.RData")
+# s1 mse
+rst.s1 <- rbind(rst.s1.glm %>%
+                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  mutate(est.method="glm"),
+                rst.s1.earth %>%
+                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  mutate(est.method="earth"))
+
+rst.s1 <- rst.s1 %>%
+  mutate(normL2=sqrt(mse*n)) %>%
+  mutate(rmse=normL2/sqrt(n))
+
+rst.s1 %>%
+  ggplot() +
+  geom_boxplot(aes(as.factor(n), y = rmse, color=est.method)) +
+  facet_wrap(~mu.type, scales='free_x')
+```
+ 
+```{r echo=FALSE, fig.width=8, fig.height=8}
+for (ml in c("glm", "earth")){
+  reg.data <- rst.s1 %>%
+    filter((est.method==ml) & (mu.type=="mse.mu"))
+
+  reg<-lm(formula = log(rmse) ~ log(n),
+          data=reg.data)
+  coeff <- coefficients(reg)
+  intercept <- coeff[1]
+  slope <- coeff[2]
+
+  p <- rst.s1 %>%
+    filter((est.method==ml) & (mu.type=="mse.mu")) %>%
+    ggplot() +
+    geom_point(aes(log(n), log(rmse))) +
+    geom_abline(intercept = intercept, slope = slope, color="red",
+                linetype="dashed", size=1.5) +
+    ggtitle(paste(ml,as.character(round(slope, 4))))
+  
+  assign(paste0("plot_", ml), p)
+}
+
+grid.arrange(plot_glm, plot_earth, ncol=1)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3}
+psi0 <- 0.04
+theta0 <- 0
+
+rst.s1.bias.psi <- rbind(
+    rst.s1.glm %>%
+     gather(est.type, est, psi.one.step.est:psi.plug.in) %>%
+     mutate(est.method="glm"),
+    rst.s1.earth %>%
+     gather(est.type, est, psi.one.step.est:psi.plug.in) %>%
+     mutate(est.method="earth")
+    )
+
+rst.s1.bias.psi %>%
+  group_by(n, est.type, est.method) %>%
+  summarise(bias=mean(est - psi0, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_line(aes(n, sqrt(n) * bias, color=est.type)) +
+  facet_wrap(~est.method, scales='free_x') +
+  theme(legend.key.size = unit(0.1,"line"))
+```
+       
+## 3 Scenario 3
+
+$$W_1 \sim Unif(-1,1)$$
+$$W_2 \sim Unif(-1,1)$$
+$$W_3 \sim Bernoulli(0.5)$$
+$$A \sim Bernoulli(\pi_0) \ where \ \pi_0=expit(0.5+\frac{1}{3}W_1)$$
+$$Y \sim N(\mu_0,1) \ where \ \mu_0=0.1+0.25*A+0.75A(W_1^2+W_3)+W_1+W_2^2$$
+$$\tau(W)=0.25+0.75*(W_1^2+W_3)$$
+$$\psi_0=0.956$$
+$$\theta_0=0.191$$
+     
+```{r echo=TRUE}
+# gam.correct: gam.model <- as.formula("Y ~ W1 + I(W2^2) + I(W1^2):A + A*W3")
+# earth: SL.library = c("SL.earth")
+# gam.mgcv: gam.model <- as.formula("Y ~ s(W1) + s(W2) + s(W1, by=A) + s(W2, by=A) + A*W3")
+# mu.reg <- mgcv::gam(gam.model, data = AW, method = "REML")
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=4}
+load("rst.s3.earth.RData")
+load("rst.s3.gam.correct.RData")
+load("rst.s3.gam.mgcv.RData")
+
+rst.s3 <- bind_rows(rst.s3.gam.correct %>%
+                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  mutate(est.method="gam.correct"),
+                rst.s3.earth %>%
+                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  mutate(est.method="earth"),
+                rst.s3.gam.mgcv %>%
+                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  mutate(est.method="gam.mgcv"))
+
+rst.s3 <- rst.s3 %>%
+  mutate(normL2=sqrt(mse*n)) %>%
+  mutate(rmse=normL2/sqrt(n))
+
+rst.s3 %>%
+  ggplot() +
+  geom_boxplot(aes(as.factor(n), y = rmse, color=est.method)) +
+  facet_wrap(~mu.type, scales='free_x')
+```
+
+```{r echo=FALSE, fig.width=8, fig.height=9}
+for (ml in c("gam.correct", "earth", "gam.mgcv")){
+  reg.data <- rst.s3 %>%
+    filter((est.method==ml) & (mu.type=="mse.mu"))
+
+  reg<-lm(formula = log(rmse) ~ log(n),
+          data=reg.data)
+  coeff <- coefficients(reg)
+  intercept <- coeff[1]
+  slope <- coeff[2]
+
+  p <- rst.s3 %>%
+    filter((est.method==ml) & (mu.type=="mse.mu")) %>%
+    ggplot() +
+    geom_point(aes(log(n), log(rmse))) +
+    geom_abline(intercept = intercept, slope = slope, color="red",
+                linetype="dashed", size=1.5) +
+    ggtitle(paste(ml,as.character(round(slope, 4))))
+
+  assign(paste0("plot_", ml), p)
+}
+
+grid.arrange(plot_earth, plot_gam.correct, plot_gam.mgcv, ncol=1)
+```
+
+```{r echo=FALSE, fig.width=10, fig.height=3}
+psi0 <- (0.25+0.75*(5/6))^2+(0.75^2*(1/5-1/9))+0.75^2*1/4
+theta0 <- (0.75^2*(1/5-1/9))+0.75^2*1/4
+
+rst.s3.bias.psi <- bind_rows(
+                      rst.s3.gam.correct %>%
+                       gather(est.type, est, psi.one.step.est:psi.plug.in) %>%
+                       mutate(est.method="gam.correct"),
+                      rst.s3.earth %>%
+                       gather(est.type, est, psi.one.step.est:psi.plug.in) %>%
+                       mutate(est.method="earth"),
+                      rst.s3.gam.mgcv %>%
+                       gather(est.type, est, psi.one.step.est:psi.plug.in) %>%
+                       mutate(est.method="gam.mgcv")
+                    )
+
+rst.s3.bias.psi %>%
+  group_by(n, est.type, est.method) %>%
+  summarise(bias=mean(est - psi0, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_line(aes(n, sqrt(n) * bias, color=est.type)) +
+  facet_wrap(~est.method, scales='free_x') +
+  theme(legend.key.size = unit(0.1, "line"))
+
+rst.s3.bias.theta <- bind_rows(
+                        rst.s3.gam.correct %>%
+                         gather(est.type, est, theta.one.step.est:theta.plug.in) %>%
+                         mutate(est.method="gam.correct"),
+                        rst.s3.earth %>%
+                         gather(est.type, est, theta.one.step.est:theta.plug.in) %>%
+                         mutate(est.method="earth"),
+                        rst.s3.gam.mgcv %>%
+                         gather(est.type, est, theta.one.step.est:theta.plug.in) %>%
+                         mutate(est.method="gam.mgcv")
+                    )
+
+rst.s3.bias.theta %>%
+  group_by(n, est.type, est.method) %>%
+  summarise(bias=mean(est - theta0, na.rm=TRUE)) %>%
+  ggplot() +
+  geom_line(aes(n, sqrt(n) * bias, color=est.type)) +
+  facet_wrap(~est.method, scales='free_x') +
+  theme(legend.key.size = unit(0.1,"line"))
+```
