@@ -34,6 +34,7 @@ theta.est2.list <- c()
 mse.mu.list <- c()
 mse.mu1.list <- c()
 mse.mu0.list <- c()
+mse.tau.list <- c()
 n.list <- c()
 j.list <- c()
 
@@ -87,6 +88,9 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu0 <- mean((mu.hats$mu0 - mu0(0, W))^2)
 
     tau.hat <- mu.hats$mu1 - mu.hats$mu0
+    tau0 <- mu0(1, W) - mu0(0, W)
+    mse.tau <- mean((tau.hat - tau0)^2)
+
     Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
 
     psi.plug.in <- mean(tau.hat^2)
@@ -114,6 +118,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu.list[j] <- mse.mu
     mse.mu1.list[j] <- mse.mu1
     mse.mu0.list[j] <- mse.mu0
+    mse.tau.list[j] <- mse.tau
     n.list[j] <- n
     j.list[j] <- j
   }
@@ -131,7 +136,8 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     theta.est = theta.est.list,
     mse.mu = mse.mu.list,
     mse.mu1 = mse.mu1.list,
-    mse.mu0 = mse.mu0.list
+    mse.mu0 = mse.mu0.list,
+    mse.tau = mse.tau.list
   )
   rst.s1.glm <- rbind(rst.s1.glm, d1)
 }
@@ -194,6 +200,9 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu0 <- mean((mu.hats$mu0 - mu0(0, W))^2)
 
     tau.hat <- mu.hats$mu1 - mu.hats$mu0
+    tau0 <- mu0(1, W) - mu0(0, W)
+    mse.tau <- mean((tau.hat - tau0)^2)
+
     Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
 
     psi.plug.in <- mean(tau.hat^2)
@@ -221,6 +230,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu.list[j] <- mse.mu
     mse.mu1.list[j] <- mse.mu1
     mse.mu0.list[j] <- mse.mu0
+    mse.tau.list[j] <- mse.tau
     n.list[j] <- n
     j.list[j] <- j
   }
@@ -238,7 +248,8 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     theta.est = theta.est.list,
     mse.mu = mse.mu.list,
     mse.mu1 = mse.mu1.list,
-    mse.mu0 = mse.mu0.list
+    mse.mu0 = mse.mu0.list,
+    mse.tau = mse.tau.list
   )
   rst.s1.earth <- rbind(rst.s1.earth, d1)
 }
@@ -303,6 +314,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
     mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
     mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+    names(mu.hats) <- c("mu1", "mu0")
 
     ## a.2 superlearner
     # mu.reg <- SuperLearner(Y=Y, X = data.frame(cbind(A, W)),
@@ -321,6 +333,9 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu0 <- mean((mu.hats$mu0 - mu0(0, W))^2)
 
     tau.hat <- mu.hats$mu1 - mu.hats$mu0
+    tau0 <- mu0(1, W) - mu0(0, W)
+    mse.tau <- mean((tau.hat - tau0)^2)
+
     Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
 
     psi.plug.in <- mean(tau.hat^2)
@@ -348,6 +363,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu.list[j] <- mse.mu
     mse.mu1.list[j] <- mse.mu1
     mse.mu0.list[j] <- mse.mu0
+    mse.tau.list[j] <- mse.tau
     n.list[j] <- n
     j.list[j] <- j
   }
@@ -365,7 +381,8 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     theta.est = theta.est.list,
     mse.mu = mse.mu.list,
     mse.mu1 = mse.mu1.list,
-    mse.mu0 = mse.mu0.list
+    mse.mu0 = mse.mu0.list,
+    mse.tau = mse.tau.list
   )
   rst.s3.gam.correct <- rbind(rst.s3.gam.correct, d1)
 }
@@ -421,6 +438,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
                            obsWeights=rep(1,n),
                            id=1:n)
     mu.hats <- data.frame(mu1=mu.reg$SL.predict[1:n], mu0=mu.reg$SL.predict[-(1:n)])
+    names(mu.hats) <- c("mu1", "mu0")
     mu.hat <- A * mu.hats$mu1 + (1-A) * mu.hats$mu0
 
     # mean square error
@@ -429,6 +447,9 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu0 <- mean((mu.hats$mu0 - mu0(0, W))^2)
 
     tau.hat <- mu.hats$mu1 - mu.hats$mu0
+    tau0 <- mu0(1, W) - mu0(0, W)
+    mse.tau <- mean((tau.hat - tau0)^2)
+
     Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
 
     psi.plug.in <- mean(tau.hat^2)
@@ -456,6 +477,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu.list[j] <- mse.mu
     mse.mu1.list[j] <- mse.mu1
     mse.mu0.list[j] <- mse.mu0
+    mse.tau.list[j] <- mse.tau
     n.list[j] <- n
     j.list[j] <- j
   }
@@ -473,7 +495,8 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     theta.est = theta.est.list,
     mse.mu = mse.mu.list,
     mse.mu1 = mse.mu1.list,
-    mse.mu0 = mse.mu0.list
+    mse.mu0 = mse.mu0.list,
+    mse.tau = mse.tau.list
   )
   rst.s3.earth <- rbind(rst.s3.earth, d1)
 }
@@ -524,6 +547,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mu1.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 1), data.frame(W)), type = 'response')
     mu0.hat <- predict(mu.reg, newdata = cbind(data.frame(A = 0), data.frame(W)), type = 'response')
     mu.hats <- data.frame(mu1=mu1.hat, mu0=mu0.hat)
+    names(mu.hats) <- c("mu1", "mu0")
 
     ## a.2 superlearner
     mu.hat <- A * mu.hats$mu1 + (1-A) * mu.hats$mu0
@@ -534,6 +558,9 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu0 <- mean((mu.hats$mu0 - mu0(0, W))^2)
 
     tau.hat <- mu.hats$mu1 - mu.hats$mu0
+    tau0 <- mu0(1, W) - mu0(0, W)
+    mse.tau <- mean((tau.hat - tau0)^2)
+
     Z.hat <- (2*A - 1) / (A * pi.hat + (1-A) * (1-pi.hat))
 
     psi.plug.in <- mean(tau.hat^2)
@@ -561,6 +588,7 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     mse.mu.list[j] <- mse.mu
     mse.mu1.list[j] <- mse.mu1
     mse.mu0.list[j] <- mse.mu0
+    mse.tau.list[j] <- mse.tau
     n.list[j] <- n
     j.list[j] <- j
   }
@@ -578,7 +606,8 @@ for (n in c(100, 250, 500, 750, 1000, 1500, 2000)){
     theta.est = theta.est.list,
     mse.mu = mse.mu.list,
     mse.mu1 = mse.mu1.list,
-    mse.mu0 = mse.mu0.list
+    mse.mu0 = mse.mu0.list,
+    mse.tau = mse.tau.list
   )
   rst.s3.gam.mgcv <- rbind(rst.s3.gam.mgcv, d1)
 }
@@ -592,10 +621,10 @@ save(rst.s3.gam.mgcv, file = "rst.s3.gam.mgcv.RData")
 load("rst.s1.glm.RData")
 load("rst.s1.earth.RData")
 rst.s1 <- rbind(rst.s1.glm %>%
-                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  gather(mu.type, mse, mse.mu:mse.tau) %>%
                   mutate(est.method="glm"),
                 rst.s1.earth %>%
-                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  gather(mu.type, mse, mse.mu:mse.tau) %>%
                   mutate(est.method="earth"))
 
 rst.s1 <- rst.s1 %>%
@@ -608,7 +637,9 @@ rst.s1 %>%
   facet_wrap(~mu.type, scales='free_x')
 
 rst.s1 %>%
-  head()
+  filter((est.method=="glm") & (mu.type=="mse.mu")) %>%
+  group_by(n) %>%
+  summarise(n())
 
 for (ml in c("glm", "earth")){
   reg.data <- rst.s1 %>%
@@ -628,6 +659,30 @@ for (ml in c("glm", "earth")){
                 linetype="dashed", size=1.5) +
     ggtitle(paste(ml,as.character(slope)))
 }
+
+for (ml in c("glm", "earth")){
+  reg.data <- rst.s1 %>%
+    filter((est.method==ml) & (mu.type=="mse.tau"))
+
+  reg<-lm(formula = log(rmse) ~ log(n),
+          data=reg.data)
+  coeff <- coefficients(reg)
+  intercept <- coeff[1]
+  slope <- coeff[2]
+
+  p <- rst.s1 %>%
+    filter((est.method==ml) & (mu.type=="mse.tau")) %>%
+    ggplot() +
+    geom_point(aes(log(n), log(rmse))) +
+    geom_abline(intercept = intercept, slope = slope, color="red",
+                linetype="dashed", size=1.5) +
+    ggtitle(paste(ml,as.character(slope)))
+
+  assign(paste0("plot_", ml), p)
+}
+
+plot_glm
+plot_earth
 
 # s1 bias
 psi0 <- 0.04
@@ -652,14 +707,17 @@ rst.s1.bias.psi %>%
 load("rst.s3.earth.RData")
 load("rst.s3.gam.correct.RData")
 load("rst.s3.gam.mgcv.RData")
+
+rst.s3.gam.correct %>%
+  head()
 rst.s3 <- bind_rows(rst.s3.gam.correct %>%
-                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  gather(mu.type, mse, mse.mu:mse.tau) %>%
                   mutate(est.method="gam.correct"),
                 rst.s3.earth %>%
-                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  gather(mu.type, mse, mse.mu:mse.tau) %>%
                   mutate(est.method="earth"),
                 rst.s3.gam.mgcv %>%
-                  gather(mu.type, mse, mse.mu:mse.mu0) %>%
+                  gather(mu.type, mse, mse.mu:mse.tau) %>%
                   mutate(est.method="gam.mgcv"))
 
 rst.s3 <- rst.s3 %>%
@@ -697,10 +755,62 @@ plot_earth
 plot_gam.correct
 plot_gam.mgcv
 
+plot.list <- c()
+for (ml in c("gam.correct", "earth", "gam.mgcv")){
+  reg.data <- rst.s3 %>%
+    filter((est.method==ml) & (mu.type=="mse.tau"))
+
+  reg<-lm(formula = log(rmse) ~ log(n),
+          data=reg.data)
+  coeff <- coefficients(reg)
+  intercept <- coeff[1]
+  slope <- coeff[2]
+
+
+  p <- rst.s3 %>%
+    filter((est.method==ml) & (mu.type=="mse.tau")) %>%
+    ggplot() +
+    geom_point(aes(log(n), log(rmse))) +
+    geom_abline(intercept = intercept, slope = slope, color="red",
+                linetype="dashed", size=1.5) +
+    ggtitle(paste(ml,as.character(slope)))
+
+  assign(paste0("plot_", ml), p)
+}
+plot_earth
+plot_gam.correct
+plot_gam.mgcv
+
 rst.s3 %>%
   ggplot() +
   geom_boxplot(aes(as.factor(n), y = mse, color=est.method)) +
   facet_wrap(~mu.type, scales='free_x')
+
+for (ml in c("gam.correct", "earth", "gam.mgcv")){
+  reg.data <- rst.s3 %>%
+    filter((est.method==ml) & (mu.type=="mse.mu0"))
+
+  reg<-lm(formula = log(rmse) ~ log(n),
+          data=reg.data)
+  coeff <- coefficients(reg)
+  intercept <- coeff[1]
+  slope <- coeff[2]
+
+  p <- rst.s3 %>%
+    filter((est.method==ml) & (mu.type=="mse.mu0")) %>%
+    ggplot() +
+    geom_point(aes(log(n), log(rmse))) +
+    geom_abline(intercept = intercept, slope = slope, color="red",
+                linetype="dashed", size=1.5) +
+    ggtitle(paste(ml,as.character(round(slope, 4))))
+
+  assign(paste0("plot_", ml), p)
+}
+
+library(gridExtra)
+grid.arrange(plot_earth, plot_gam.correct, plot_gam.mgcv, ncol=1)
+
+
 
 # s3 bias
 psi0 <- (0.25+0.75*(5/6))^2+(0.75^2*(1/5-1/9))+0.75^2*1/4
@@ -718,9 +828,11 @@ rst.s3.bias.psi <- bind_rows(rst.s3.gam.correct %>%
 
 rst.s3.bias.psi %>%
   group_by(n, est.type, est.method) %>%
-  summarise(bias=mean(est - psi0, na.rm=TRUE)) %>%
+  summarise(bias=mean(est - psi0, na.rm=TRUE),
+            abs.bias=mean(abs(est - psi0), na.rm=TRUE)) %>%
   ggplot() +
   geom_line(aes(n, sqrt(n) * bias, color=est.type)) +
+  geom_line(aes(n, sqrt(n) * abs.bias, color=est.type)) +
   facet_wrap(~est.method, scales='free_x') +
   theme(legend.key.size = unit(0.1,"line"))
 
